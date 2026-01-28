@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 export default function Signup() {
@@ -11,6 +12,7 @@ export default function Signup() {
     const [username, setUsername] = useState("")
     const [loading, setLoading] = useState(false)
     const [emailError, setEmailError] = useState("")
+    const navigate = useNavigate()
 
     // Strict email validation
     const validateEmail = (emailValue: string): boolean => {
@@ -86,18 +88,51 @@ export default function Signup() {
         console.log("Username validation passed:", username.toLowerCase())
 
         try {
-            console.log("Skipping duplicate checks, relying on database constraints...")
+            console.log("Checking for existing email and username...")
 
-            // Sign up with magic link
+            // Check if email is taken
+            const { data: existingEmail } = await supabase
+                .from("users")
+                .select("id")
+                .eq("email", email)
+                .single()
+
+            if (existingEmail) {
+                console.warn("Email already exists:", email)
+                toast.error("Email Already Registered", {
+                    description: "This email is already associated with an account. Please log in instead."
+                })
+                setLoading(false)
+                return
+            }
+
+            // Check if username is taken
+            const { data: existingUser } = await supabase
+                .from("users")
+                .select("id")
+                .eq("username", username.toLowerCase())
+                .single()
+
+            if (existingUser) {
+                console.warn("Username already exists:", username.toLowerCase())
+                toast.error("Username Taken", {
+                    description: "This username is already taken. Please choose another one."
+                })
+                setLoading(false)
+                return
+            }
+
+            console.log("No duplicates found, proceeding with signup...")
+
+            // Sign up with OTP
             console.log("Attempting to sign up with OTP...")
             console.log("Email:", email)
             console.log("Username:", username.toLowerCase())
             console.log("Name:", name.trim())
-            
+
             const { data, error } = await supabase.auth.signInWithOtp({
                 email,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
                     data: {
                         name: name.trim(),
                         username: username.toLowerCase(),
@@ -114,7 +149,7 @@ export default function Signup() {
                 console.error("Error code:", error.code)
                 console.error("Error message:", error.message)
                 console.error("Error status:", error.status)
-                
+
                 // Handle specific errors
                 if (error.message.includes("User already exists")) {
                     toast.error("Email Already Registered", {
@@ -136,8 +171,8 @@ export default function Signup() {
             console.log("OTP sent successfully to:", email)
 
             // Success message
-            toast.success("Magic Link Sent!", {
-                description: `Check your email at ${email} for the confirmation link to complete your registration`
+            toast.success("Verification Code Sent!", {
+                description: `Check your email at ${email} for the 6-digit verification code`
             })
 
             console.log("Clearing form data...")
@@ -147,7 +182,9 @@ export default function Signup() {
             setUsername("")
             setEmailError("")
 
-            console.log("Signup process completed successfully")
+            console.log("Redirecting to OTP input...")
+            // Redirect to OTP input page
+            navigate(`/auth/input-otp?email=${encodeURIComponent(email)}`)
 
         } catch (err: any) {
             console.error("Unexpected signup error:", err)
@@ -248,7 +285,7 @@ export default function Signup() {
                                         </p>
                                     ) : (
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            We'll send you a magic link to sign in securely
+                                            We'll send you a 6-digit verification code to sign in securely
                                         </p>
                                     )}
                                 </div>
@@ -261,10 +298,10 @@ export default function Signup() {
                                     {loading ? (
                                         <span className="flex items-center justify-center gap-2">
                                             <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                            Sending Magic Link...
+                                            Sending Verification Code...
                                         </span>
                                     ) : (
-                                        "Sign In with Magic Link"
+                                        "Send Verification Code"
                                     )}
                                 </Button>
                             </form>

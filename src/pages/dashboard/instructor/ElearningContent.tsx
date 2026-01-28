@@ -4,7 +4,9 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
 import { ArrowLeft, BookOpen, Sparkles, FileText, Link } from "lucide-react"
 
@@ -26,6 +28,11 @@ interface ElearningContent {
         title: string
         url: string
       }>
+      videos: Array<{
+        title: string
+        videoId: string
+        url: string
+      }>
     }>
   }
   created_at: string
@@ -38,6 +45,7 @@ export default function ElearningContent() {
   const [elearningContents, setElearningContents] = useState<ElearningContent[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [inputType, setInputType] = useState<'paragraph' | 'bullets'>('bullets')
   const [formData, setFormData] = useState({
     topic: "",
     title: ""
@@ -83,9 +91,37 @@ export default function ElearningContent() {
     }
   }
 
+  const fetchYouTubeVideos = async (query: string, maxResults: number = 2) => {
+    try {
+      const apiKey = import.meta.env.VITE_PUBLIC_YOUTUBE_API_KEY
+      if (!apiKey) {
+        console.warn("YouTube API key not found")
+        return []
+      }
+
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&key=${apiKey}&type=video&maxResults=${maxResults}&order=relevance&safeSearch=strict`
+      )
+
+      if (!response.ok) {
+        throw new Error(`YouTube API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.items.map((item: any) => ({
+        title: item.snippet.title,
+        videoId: item.id.videoId,
+        url: `https://www.youtube.com/watch?v=${item.id.videoId}`
+      }))
+    } catch (error) {
+      console.error("Error fetching YouTube videos:", error)
+      return []
+    }
+  }
+
   const generateContentWithAI = async (prompt: string) => {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${import.meta.env.VITE_PUBLIC_GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_PUBLIC_GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,28 +167,35 @@ export default function ElearningContent() {
 
       const aiPrompt = `Generate comprehensive e-learning content about "${formData.topic}" for a course.
 
-Create detailed content with 4-6 sections. Each section should include:
-- A clear section title
-- Detailed explanatory content (200-400 words)
-- 2-4 relevant external links with titles
+      Create detailed content with 4-6 sections. Each section should include:
+      - A clear section title
+      - Detailed explanatory content (200-400 words)
+      - 2-4 relevant external links with titles
 
-Format the response as valid JSON:
-{
-  "sections": [
-    {
-      "title": "Section Title",
-      "content": "Detailed content here...",
-      "links": [
-        {
-          "title": "Link Title",
-          "url": "https://example.com"
-        }
-      ]
-    }
-  ]
-}
+      Format the response as valid JSON:
+      {
+        "sections": [
+          {
+            "title": "Section Title",
+            "content": "Detailed content here...",
+            "links": [
+              {
+                "title": "Link Title",
+                "url": "https://example.com"
+              }
+            ],
+            "videos": [
+              {
+                "title": "Video Title",
+                "videoId": "VIDEO_ID",
+                "url": "https://www.youtube.com/watch?v=VIDEO_ID"
+              }
+            ]
+          }
+        ]
+      }
 
-Ensure all links are real, educational, and relevant. Focus on quality sources like educational websites, research papers, or reputable organizations.`
+      Ensure all links are real, educational, and relevant. Focus on quality sources like educational websites, research papers, or reputable organizations. For videos, suggest relevant YouTube video titles and IDs that would complement the section content.`
 
       const generatedContent = await generateContentWithAI(aiPrompt)
 
@@ -170,10 +213,17 @@ Ensure all links are real, educational, and relevant. Focus on quality sources l
             {
               title: "Introduction",
               content: "This is a basic introduction to the topic.",
-              links: []
+              links: [],
+              videos: []
             }
           ]
         }
+      }
+
+      // Fetch real YouTube videos for each section
+      for (const section of parsedContent.sections) {
+        const videos = await fetchYouTubeVideos(`${section.title} ${formData.topic}`, 2)
+        section.videos = videos
       }
 
       const { data, error } = await supabase
@@ -181,7 +231,7 @@ Ensure all links are real, educational, and relevant. Focus on quality sources l
         .insert({
           course_id: courseId,
           topic: formData.topic,
-          title: formData.title,
+          title: `Module ${elearningContents.length + 1}: ${formData.title}`,
           content: parsedContent,
           ai_generated: true
         })
@@ -192,8 +242,9 @@ Ensure all links are real, educational, and relevant. Focus on quality sources l
 
       setElearningContents([data, ...elearningContents])
       setFormData({ topic: "", title: "" })
+      setInputType('bullets')
       toast.success("E-learning content created", {
-        description: "AI-generated content with sources has been created successfully"
+        description: "AI-generated content with sources and YouTube videos has been created successfully"
       })
     } catch (error: any) {
       console.error("Error creating elearning content:", error)
@@ -246,7 +297,7 @@ Ensure all links are real, educational, and relevant. Focus on quality sources l
             Generate E-Learning Content
           </CardTitle>
           <CardDescription>
-            AI will create detailed content with sections and educational sources
+            AI will create detailed content with sections, educational sources, and YouTube videos
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -260,15 +311,69 @@ Ensure all links are real, educational, and relevant. Focus on quality sources l
                 placeholder="e.g., Introduction to Machine Learning"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="topic">Topic</Label>
-              <Input
-                id="topic"
-                value={formData.topic}
-                onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                placeholder="e.g., Machine Learning Fundamentals"
-              />
+            <div className="space-y-4">
+              <Label>Topic Input Type</Label>
+              <RadioGroup value={inputType} onValueChange={(value) => setInputType(value as 'paragraph' | 'bullets')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="bullets" id="bullets" />
+                  <Label htmlFor="bullets">Bullet Points</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="paragraph" id="paragraph" />
+                  <Label htmlFor="paragraph">Paragraph</Label>
+                </div>
+              </RadioGroup>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="topic">Topic</Label>
+            <Textarea
+              id="topic"
+              value={formData.topic}
+              onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+              onKeyDown={(e) => {
+                if (inputType === 'bullets' && e.key === 'Enter') {
+                  e.preventDefault()
+                  const textarea = e.target as HTMLTextAreaElement
+                  const start = textarea.selectionStart
+                  const end = textarea.selectionEnd
+                  const value = formData.topic
+                  const before = value.substring(0, start)
+                  const after = value.substring(end)
+                  const newValue = before + '\n- ' + after
+                  setFormData({ ...formData, topic: newValue })
+                  // Set cursor position after the inserted bullet
+                  setTimeout(() => {
+                    textarea.selectionStart = textarea.selectionEnd = start + 3
+                  }, 0)
+                }
+              }}
+              onPaste={(e) => {
+                if (inputType === 'bullets') {
+                  e.preventDefault()
+                  const textarea = e.target as HTMLTextAreaElement
+                  const start = textarea.selectionStart
+                  const end = textarea.selectionEnd
+                  const pasted = e.clipboardData.getData('text')
+                  const lines = pasted.split('\n').map(line => line.trim() ? `- ${line.trim()}` : '').join('\n')
+                  const value = formData.topic
+                  const before = value.substring(0, start)
+                  const after = value.substring(end)
+                  const newValue = before + lines + after
+                  setFormData({ ...formData, topic: newValue })
+                  // Set cursor position after the pasted content
+                  setTimeout(() => {
+                    textarea.selectionStart = textarea.selectionEnd = start + lines.length
+                  }, 0)
+                }
+              }}
+              placeholder={
+                inputType === 'bullets'
+                  ? "Enter topics as bullet points (one per line):\n- Machine Learning Fundamentals\n- Neural Networks\n- Deep Learning Algorithms"
+                  : "Describe the topic in a paragraph..."
+              }
+              rows={inputType === 'bullets' ? 5 : 3}
+            />
           </div>
           <Button onClick={handleCreateElearningContent} disabled={creating} className="w-full">
             {creating ? (
@@ -328,6 +433,11 @@ Ensure all links are real, educational, and relevant. Focus on quality sources l
                         <Link className="w-3 h-3 text-blue-500" />
                         <span className="text-xs text-blue-600">{section.links?.length || 0} sources</span>
                       </div>
+                      {section.videos && section.videos.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs text-red-600">📺 {section.videos.length} videos</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

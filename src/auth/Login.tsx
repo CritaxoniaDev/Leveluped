@@ -1,15 +1,16 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 export default function Login() {
     const [email, setEmail] = useState("")
     const [loading, setLoading] = useState(false)
     const [emailError, setEmailError] = useState("")
+    const navigate = useNavigate()
 
     // Strict email validation
     const validateEmail = (emailValue: string): boolean => {
@@ -57,7 +58,7 @@ export default function Login() {
         try {
             console.log("Checking if email exists in users table...")
 
-            // Check if email exists in users table (using head to bypass RLS)
+            // Check if email exists in users table
             const { data: userExists, error: checkError, count } = await supabase
                 .from("users")
                 .select("id", { count: 'exact', head: true })
@@ -86,12 +87,9 @@ export default function Login() {
             console.log("Email found in database")
             console.log("Attempting to send OTP to:", email)
 
-            // Send magic link for passwordless authentication
+            // Send OTP for passwordless authentication
             const { error: otpError } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
-                }
+                email
             })
 
             console.log("OTP response:", { error: otpError })
@@ -115,18 +113,20 @@ export default function Login() {
                 return
             }
 
-            console.log("Magic link sent successfully to:", email)
+            console.log("OTP sent successfully to:", email)
 
-            // Successfully sent magic link
-            toast.success("Magic Link Sent!", {
-                description: `Check your email at ${email} for the sign-in link to access your account`
+            // Successfully sent OTP
+            toast.success("Verification Code Sent!", {
+                description: `Check your email at ${email} for the 8-digit verification code`
             })
 
             console.log("Clearing form data...")
             setEmail("")
             setEmailError("")
 
-            console.log("Login process completed successfully")
+            console.log("Redirecting to OTP input...")
+            // Redirect to OTP input page
+            navigate(`/auth/input-otp?email=${encodeURIComponent(email)}`)
 
         } catch (err: any) {
             console.error("Unexpected login error:", err)
@@ -152,7 +152,7 @@ export default function Login() {
                     <div className="flex flex-col">
                         {/* Logo Section */}
                         <div className="mb-8">
-                            <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
+                            <h1 className="text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
                                 Welcome Back!
                             </h1>
 

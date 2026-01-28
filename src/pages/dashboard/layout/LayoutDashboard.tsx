@@ -20,13 +20,16 @@ import {
     LayoutDashboard as LayoutDashboardIcon,
     BookOpen,
     Users,
-    BarChart3,
     Settings,
     Trophy,
     MessageSquare,
     ChevronLeft,
     ChevronRight,
+    CircleStar,
 } from "lucide-react"
+import {
+    checkAllAchievements
+} from "@/helpers/achievementHelper"
 
 interface LayoutDashboardProps {
     children: React.ReactNode
@@ -54,15 +57,6 @@ function SidebarContent() {
         fetchUserRole()
     }, [])
 
-    const getLearnerMenuItems = () => [
-        { icon: LayoutDashboardIcon, label: "Dashboard", href: "/dashboard/learner" },
-        { icon: BookOpen, label: "My Courses", href: "/dashboard/learner/courses" },
-        { icon: Trophy, label: "Achievements", href: "/dashboard/learner/achievements" },
-        { icon: BarChart3, label: "Progress", href: "/dashboard/learner/progress" },
-        { icon: MessageSquare, label: "Messages", href: "/dashboard/learner/messages" },
-        { icon: Settings, label: "Settings", href: "/dashboard/learner/settings" },
-    ]
-
     const getInstructorMenuItems = () => [
         { icon: LayoutDashboardIcon, label: "Dashboard", href: "/dashboard/instructor" },
         { icon: BookOpen, label: "My Courses", href: "/dashboard/instructor/courses" },
@@ -73,16 +67,14 @@ function SidebarContent() {
 
     const getAdminMenuItems = () => [
         { icon: LayoutDashboardIcon, label: "Dashboard", href: "/dashboard/admin" },
+        { icon: BookOpen, label: "Course Map", href: "/dashboard/admin/courses" },
         { icon: Users, label: "Users", href: "/dashboard/admin/users" },
-        { icon: BookOpen, label: "Courses", href: "/dashboard/admin/courses" },
         { icon: MessageSquare, label: "Support", href: "/dashboard/admin/support" },
         { icon: Settings, label: "Settings", href: "/dashboard/admin/settings" },
     ]
 
     const getMenuItems = () => {
         switch (userProfile?.role) {
-            case "learner":
-                return getLearnerMenuItems()
             case "instructor":
                 return getInstructorMenuItems()
             case "admin":
@@ -164,10 +156,13 @@ function CollapsibleHeader() {
 
 function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
     const navigate = useNavigate()
+    const location = useLocation()
     const { state } = useSidebar()
-    const [user, setUser] = useState<any>(null)
+    const [, setUser] = useState<any>(null)
     const [userProfile, setUserProfile] = useState<any>(null)
+    const [userLevel, setUserLevel] = useState<number | null>(null)
     const [loading, setLoading] = useState(true)
+    const [achievementsChecked, setAchievementsChecked] = useState(false)
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -199,6 +194,27 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
 
                 setUserProfile(profile)
 
+                // Fetch user level if learner
+                if (profile.role === 'learner') {
+                    const { data: stats } = await supabase
+                        .from("user_stats")
+                        .select("current_level")
+                        .eq("user_id", session.user.id)
+                        .single()
+
+                    if (stats) {
+                        setUserLevel(stats.current_level)
+
+                        // Check and award achievements only once per session
+                        if (!achievementsChecked) {
+                            // Use comprehensive achievement check
+                            await checkAllAchievements(session.user.id)
+
+                            setAchievementsChecked(true)
+                        }
+                    }
+                }
+
                 // Check if user role is allowed
                 if (allowedRoles && !allowedRoles.includes(profile.role)) {
                     toast.error("Access Denied", {
@@ -227,6 +243,8 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
                 if (event === "SIGNED_OUT" || !session) {
                     setUser(null)
                     setUserProfile(null)
+                    setUserLevel(null)
+                    setAchievementsChecked(false)
                     navigate("/login")
                 }
             }
@@ -235,11 +253,46 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
         return () => {
             subscription?.unsubscribe()
         }
-    }, [navigate, allowedRoles])
+    }, [navigate, allowedRoles, achievementsChecked])
+
+    // Subscribe to user stats changes for realtime level updates
+    useEffect(() => {
+        if (!userProfile || userProfile.role !== 'learner') return
+
+        let channel: any = null
+
+        const setupRealtimeSubscription = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return
+
+            channel = supabase.channel(`user_stats_level_${session.user.id}`)
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'user_stats',
+                    filter: `user_id=eq.${session.user.id}`
+                }, (payload) => {
+                    const newStats = payload.new as any
+                    if (newStats.current_level && newStats.current_level !== userLevel) {
+                        setUserLevel(newStats.current_level)
+                        // Toast is handled in the Achievements component
+                    }
+                })
+                .subscribe()
+        }
+
+        setupRealtimeSubscription()
+
+        return () => {
+            if (channel) {
+                supabase.removeChannel(channel)
+            }
+        }
+    }, [userProfile, userLevel])
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-950">
+            <div className="flex items-center justify-center w-full h-screen bg-gray-50 dark:bg-gray-950">
                 <div className="text-center">
                     <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                     <p className="text-gray-600 dark:text-gray-400">Loading...</p>
@@ -248,27 +301,64 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
         )
     }
 
-    return (
-        <div className="flex flex-col w-full h-screen bg-gray-50 dark:bg-gray-950">
-            {/* Header */}
-            <Header
-                userName={userProfile?.name || userProfile?.username}
-                userRole={userProfile?.role}
-            />
+    const isLearner = userProfile?.role === 'learner'
+    // Check if current page is learner dashboard (where floating header should appear)
+    const isLearnerDashboardPage = location.pathname === '/dashboard/learner'
+    const shouldUseFloatingHeader = isLearner && isLearnerDashboardPage
 
-            {/* Main content with sidebar */}
-            <div className="flex flex-1 overflow-hidden relative">
-                {/* Sidebar */}
-                <div className={`absolute left-0 top-0 h-full z-10 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${state === "expanded" ? "w-60" : "w-10"}`}>
-                    <div className={`flex h-full flex-col ${state === "collapsed" ? "pt-12" : ""}`}>
-                        <SidebarContent />
+    const learnerMenuItems = [
+        { icon: LayoutDashboardIcon, label: "Dashboard", href: "/dashboard/learner" },
+        { icon: BookOpen, label: "My Courses", href: "/dashboard/learner/my-courses" },
+        { icon: Trophy, label: "Achievements", href: "/dashboard/learner/achievements" },
+        { icon: CircleStar, label: "Leaderboards", href: "/dashboard/learner/leaderboard" },
+        { icon: Settings, label: "Settings", href: "/dashboard/learner/settings" },
+    ]
+
+    return (
+        <div className="flex flex-col w-full h-screen dark:bg-gray-950">
+            {/* Floating Header - Only for learners on dashboard page */}
+            {shouldUseFloatingHeader && (
+                <div className="fixed top-0 left-0 right-0 z-50 flex justify-center p-2 sm:p-3 pointer-events-none">
+                    <div className="pointer-events-auto w-full">
+                        <Header
+                            userName={userProfile?.name || userProfile?.username}
+                            userRole={userProfile?.role}
+                            userLevel={userLevel}
+                            menuItems={learnerMenuItems}
+                            isFloating={true}
+                        />
                     </div>
-                    <CollapsibleHeader />
                 </div>
+            )}
+
+            {/* Regular Header - For learners on other pages and for instructors and admins */}
+            {!shouldUseFloatingHeader && (
+                <Header
+                    userName={userProfile?.name || userProfile?.username}
+                    userRole={userProfile?.role}
+                    userLevel={isLearner ? userLevel : undefined}
+                    menuItems={isLearner ? learnerMenuItems : undefined}
+                    isFloating={false}
+                />
+            )}
+
+            {/* Main content with conditional sidebar */}
+            <div className="flex flex-1 overflow-hidden relative">
+                {!isLearner && (
+                    <>
+                        {/* Sidebar */}
+                        <div className={`absolute left-0 top-0 h-full z-10 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${state === "expanded" ? "w-60" : "w-16"}`}>
+                            <div className={`flex h-full flex-col ${state === "collapsed" ? "pt-12" : ""}`}>
+                                <SidebarContent />
+                            </div>
+                            <CollapsibleHeader />
+                        </div>
+                    </>
+                )}
 
                 {/* Page content */}
-                <main className={`flex-1 overflow-y-auto transition-all duration-300 ${state === "expanded" ? "ml-60" : "ml-10"}`}>
-                    <div className="p-6 px-10">
+                <main className={`flex-1 overflow-y-auto transition-all duration-300 ${!isLearner ? (state === "expanded" ? "ml-60" : "ml-16") : "ml-0"}`}>
+                    <div className={isLearnerDashboardPage ? "h-full" : isLearner ? "px-10 py-6 h-full overflow-y-auto" : "p-4 sm:p-6 h-full overflow-y-auto"}>
                         {children}
                     </div>
                 </main>

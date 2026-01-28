@@ -55,11 +55,23 @@ interface ResourceContent {
     quests?: any[]
 }
 
+interface ElearningContent {
+    id: string
+    title: string
+    content: {
+        sections: Array<{
+            title: string
+            content: string
+        }>
+    }
+}
+
 export default function ViewCourse() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [course, setCourse] = useState<Course | null>(null)
     const [resourceContents, setResourceContents] = useState<ResourceContent[]>([])
+    const [elearningContents, setElearningContents] = useState<ElearningContent[]>([])
     const [loading, setLoading] = useState(true)
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
     const [creating, setCreating] = useState(false)
@@ -74,16 +86,44 @@ export default function ViewCourse() {
         topic: "",
         difficulty: "beginner" as "beginner" | "intermediate" | "advanced",
         question_count: 5,
-        time_limit: 10, // Add this
+        time_limit: 10,
+        selectedElearningId: "" as string,
     })
+
 
     useEffect(() => {
         if (id) {
             fetchCourse()
             fetchCourseStats()
             fetchResourceContents()
+            fetchElearningContents()
         }
     }, [id])
+
+    // Add attempts calculation
+    // const getMaxAttempts = (difficulty: string) => {
+    //     switch (difficulty) {
+    //         case "beginner": return 3
+    //         case "intermediate": return 2
+    //         case "advanced": return 1
+    //         default: return 3
+    //     }
+    // }
+
+    const fetchElearningContents = async () => {
+        try {
+            const { data, error } = await supabase
+                .from("elearning_content")
+                .select("id, title, content")
+                .eq("course_id", id)
+                .order("created_at", { ascending: false })
+
+            if (error) throw error
+            setElearningContents(data || [])
+        } catch (error: any) {
+            console.error("Error fetching e-learning contents:", error)
+        }
+    }
 
     const fetchCourse = async () => {
         try {
@@ -227,43 +267,91 @@ export default function ViewCourse() {
             const { data: { session } } = await supabase.auth.getSession()
             if (!session) return
 
+            // Calculate the next topic index for this course
+            const { data: existingContents, error: indexError } = await supabase
+                .from("resource_content")
+                .select("topic_index")
+                .eq("course_id", id)
+                .order("topic_index", { ascending: false })
+                .limit(1)
+
+            if (indexError) throw indexError
+
+            const nextIndex = existingContents && existingContents.length > 0 ? (existingContents[0].topic_index || 0) + 1 : 1
+            const autoTitle = `Topic ${nextIndex}`
+
+            // Get selected e-learning content if any
+            let additionalContext = ""
+            if (formData.selectedElearningId) {
+                const selectedContent = elearningContents.find(c => c.id === formData.selectedElearningId)
+                if (selectedContent) {
+                    additionalContext = `\n\nAdditional context from e-learning content "${selectedContent.title}":\n${selectedContent.content.sections.map(s => `${s.title}: ${s.content}`).join('\n')}`
+                }
+            }
+
+            const challengeJsonFormat = `[
+                {
+                    "id": 1,
+                    "question": "Fill in the blank: [BLANK] is essential for success in ${course?.category}.",
+                    "answer": "example answer",
+                    "explanation": "Explanation based on ${course?.category} principles.",
+                    "code_example": "${course?.category === 'Programming' ? 'javascript\\n// Example code\\n' : 'text\\n// General example\\n'}",
+                    "difficulty": "${formData.difficulty}"
+                }
+            ]`
+
+            const quizJsonFormat = `[
+                {
+                    "id": 1,
+                    "question": "What is the capital of France?",
+                    "options": ["London", "Berlin", "Paris", "Madrid"],
+                    "correct_answer": "C",
+                    "explanation": "Paris is the capital and largest city of France."
+                }
+            ]`
+
             // Generate AI prompt for content
-            const contentPrompt = `Generate ${formData.question_count} multiple choice questions for the course "${course?.title}" on the topic "${formData.topic}" with ${formData.difficulty} difficulty level.
+            const contentPrompt = formData.type === "challenge"
+                ? `Generate ${formData.question_count} fill-in-the-blank questions for the course "${course?.title}" on the topic "${formData.topic}" with ${formData.difficulty} difficulty level in the ${course?.category} category.${additionalContext}
 
-Each question must have:
-- A clear question text
-- Exactly 4 options labeled A, B, C, D
-- One correct answer (specify which option)
+            Each question should include:
+            - A clear fill-in-the-blank question (use [BLANK] for blanks)
+            - The correct answer
+            - An explanation
+            - A code example if applicable (for Programming), or text example otherwise (wrap in \`\`\`language or \`\`\`text)
 
-Return ONLY a valid JSON array with no additional text. Format:
-[
-  {
-    "id": 1,
-    "question": "What is the capital of France?",
-    "options": ["Paris", "London", "Berlin", "Madrid"],
-    "correct_answer": "A"
-  }
-]`
+            Return ONLY a valid JSON array with no additional text. Format:
+            ${challengeJsonFormat}`
+                : `Generate ${formData.question_count} multiple choice questions for the course "${course?.title}" on the topic "${formData.topic}" with ${formData.difficulty} difficulty level in the ${course?.category} category.${additionalContext}
+
+            Each question should include:
+            - A clear question
+            - Four options (A, B, C, D)
+            - The correct answer
+            - An explanation
+
+            Return ONLY a valid JSON array with no additional text. Format:
+            ${quizJsonFormat}`
 
             // Generate AI prompt for quests
-            const questsPrompt = `Generate 3-5 gamified quests for students completing ${formData.type} content on "${formData.topic}" in the course "${course?.title}".
+            const questsPrompt = `Generate 3-5 gamified quests for students completing ${formData.type} content on "${formData.topic}" in the course "${course?.title}".${additionalContext}
 
-Each quest should be:
-- Engaging and achievable
-- Related to the content
-- Include XP rewards (50-200 XP)
-- Have clear completion criteria
+                Each quest should be:
+                - Engaging and achievable
+                - Related to the content
+                - Include XP rewards (50-200 XP)
+                - Have clear completion criteria
 
-Return ONLY a valid JSON array with no additional text. Format:
-[
-  {
-    "id": 1,
-    "title": "Quiz Master",
-    "description": "Answer all questions correctly in the quiz",
-    "xp_reward": 100,
-    "completion_criteria": "Score 100% on the quiz"
-  }
-]`
+                Return ONLY a valid JSON array with no additional text. Format:
+                [
+                {
+                    "id": 1,
+                    "title": "Quiz Master",
+                    "description": "Answer all questions correctly in the quiz",
+                    "xp_reward": 100,
+                    "completion_criteria": "Score 100% on the quiz"
+                }
+                ]`
 
             // Generate content and quests using AI
             const [generatedContent, generatedQuests] = await Promise.all([
@@ -277,18 +365,35 @@ Return ONLY a valid JSON array with no additional text. Format:
             try {
                 const cleanedContent = generatedContent?.trim().replace(/```json\s*|\s*```/g, '') || '[]'
                 parsedContent = JSON.parse(cleanedContent)
-                if (!Array.isArray(parsedContent) || parsedContent.length === 0) {
-                    throw new Error('Invalid content structure')
+                if (formData.type === "challenge") {
+                    if (!Array.isArray(parsedContent) || parsedContent.length === 0) {
+                        throw new Error('Invalid challenge structure')
+                    }
+                } else {
+                    if (!Array.isArray(parsedContent) || parsedContent.length === 0) {
+                        throw new Error('Invalid content structure')
+                    }
                 }
             } catch (e) {
                 console.error('Failed to parse AI content response:', e)
-                parsedContent = Array.from({ length: formData.question_count }, (_, i) => ({
-                    id: i + 1,
-                    question: `Sample ${formData.type} question ${i + 1}`,
-                    options: formData.type === 'quiz' ? ['A', 'B', 'C', 'D'] : undefined,
-                    correct_answer: formData.type === 'quiz' ? 'A' : undefined,
-                    challenge: formData.type === 'challenge' ? `Sample challenge ${i + 1}` : undefined
-                }))
+                if (formData.type === "challenge") {
+                    parsedContent = Array.from({ length: formData.question_count }, (_, i) => ({
+                        id: i + 1,
+                        question: `Sample fill-in-the-blank question ${i + 1} with [BLANK]`,
+                        answer: "sample answer",
+                        explanation: "Sample explanation",
+                        code_example: "```javascript\n// sample code\n```",
+                        difficulty: formData.difficulty
+                    }))
+                } else {
+                    parsedContent = Array.from({ length: formData.question_count }, (_, i) => ({
+                        id: i + 1,
+                        question: `Sample ${formData.type} question ${i + 1}`,
+                        options: formData.type === 'quiz' ? ['A', 'B', 'C', 'D'] : undefined,
+                        correct_answer: formData.type === 'quiz' ? 'A' : undefined,
+                        explanation: formData.type === 'quiz' ? 'Sample explanation' : undefined
+                    }))
+                }
             }
 
             try {
@@ -322,14 +427,15 @@ Return ONLY a valid JSON array with no additional text. Format:
                 .insert({
                     course_id: id,
                     type: formData.type,
-                    title: formData.title,
+                    title: autoTitle,
                     description: formData.description,
                     topic: formData.topic,
                     difficulty: formData.difficulty,
                     question_count: formData.question_count,
                     content: parsedContent,
                     quests: parsedQuests,
-                    time_limit: formData.time_limit, // Add this
+                    topic_index: nextIndex,
+                    time_limit: formData.time_limit,
                     ai_prompt: `${contentPrompt}\n\n---\n\n${questsPrompt}`,
                     generated_at: new Date().toISOString(),
                 })
@@ -347,10 +453,11 @@ Return ONLY a valid JSON array with no additional text. Format:
                 difficulty: "beginner",
                 question_count: 5,
                 time_limit: 10,
+                selectedElearningId: "",
             })
             setIsCreateDialogOpen(false)
             toast.success("Resource content created", {
-                description: `${formData.type === 'quiz' ? 'Quiz' : 'Challenge'} with quests has been created successfully`
+                description: `${formData.type === 'quiz' ? 'Quiz' : 'Challenge'} "${autoTitle}" has been created successfully`
             })
         } catch (error: any) {
             console.error("Error creating resource content:", error)
@@ -555,107 +662,142 @@ Return ONLY a valid JSON array with no additional text. Format:
                                     Create Content
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px]">
+                            <DialogContent className="sm:max-w-[600px]">
                                 <DialogHeader>
                                     <DialogTitle>Create Quiz or Challenge</DialogTitle>
                                     <DialogDescription>
                                         Generate AI-powered interactive content for your course.
                                     </DialogDescription>
                                 </DialogHeader>
-                                <div className="grid gap-4 py-4">
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="type" className="text-right text-sm font-medium">
-                                            Type
-                                        </label>
-                                        <Select value={formData.type} onValueChange={(value: "quiz" | "challenge") => setFormData({ ...formData, type: value })}>
-                                            <SelectTrigger className="col-span-3">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="quiz">Quiz</SelectItem>
-                                                <SelectItem value="challenge">Challenge</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="title" className="text-right text-sm font-medium">
-                                            Title
-                                        </label>
-                                        <Input
-                                            id="title"
-                                            value={formData.title}
-                                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                            className="col-span-3"
-                                            placeholder="Content title"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="description" className="text-right text-sm font-medium">
-                                            Description
-                                        </label>
-                                        <Textarea
-                                            id="description"
-                                            value={formData.description}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            className="col-span-3"
-                                            placeholder="Brief description"
-                                            rows={2}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="topic" className="text-right text-sm font-medium">
-                                            Topic
-                                        </label>
-                                        <Input
-                                            id="topic"
-                                            value={formData.topic}
-                                            onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                                            className="col-span-3"
-                                            placeholder="Specific topic to cover"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="difficulty" className="text-right text-sm font-medium">
-                                            Difficulty
-                                        </label>
-                                        <Select value={formData.difficulty} onValueChange={(value: "beginner" | "intermediate" | "advanced") => setFormData({ ...formData, difficulty: value })}>
-                                            <SelectTrigger className="col-span-3">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="beginner">Beginner</SelectItem>
-                                                <SelectItem value="intermediate">Intermediate</SelectItem>
-                                                <SelectItem value="advanced">Advanced</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="time_limit" className="text-right text-sm font-medium">
-                                            Time Limit (minutes)
-                                        </label>
-                                        <Input
-                                            id="time_limit"
-                                            type="number"
-                                            value={formData.time_limit}
-                                            onChange={(e) => setFormData({ ...formData, time_limit: parseInt(e.target.value) || 10 })}
-                                            className="col-span-3"
-                                            min="1"
-                                            max="60"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <label htmlFor="question_count" className="text-right text-sm font-medium">
-                                            Question Count
-                                        </label>
-                                        <Input
-                                            id="question_count"
-                                            type="number"
-                                            value={formData.question_count}
-                                            onChange={(e) => setFormData({ ...formData, question_count: parseInt(e.target.value) || 5 })}
-                                            className="col-span-3"
-                                            min="1"
-                                            max="20"
-                                        />
+                                <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div className="space-y-2">
+                                                <label htmlFor="type" className="text-sm font-medium">
+                                                    Type
+                                                </label>
+                                                <Select value={formData.type} onValueChange={(value: "quiz" | "challenge") => {
+                                                    setFormData({
+                                                        ...formData,
+                                                        type: value,
+                                                        question_count: value === "challenge" ? 5 : 5
+                                                    })
+                                                }}>
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="quiz">Quiz</SelectItem>
+                                                        <SelectItem value="challenge">Challenge</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label htmlFor="title" className="text-sm font-medium">
+                                                    Title
+                                                </label>
+                                                <Input
+                                                    id="title"
+                                                    value={formData.title}
+                                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                                    placeholder="Content title"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label htmlFor="topic" className="text-sm font-medium">
+                                                    Topic
+                                                </label>
+                                                <Input
+                                                    id="topic"
+                                                    value={formData.topic}
+                                                    onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                                                    placeholder="Specific topic to cover"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label htmlFor="description" className="text-sm font-medium">
+                                                Description
+                                            </label>
+                                            <Textarea
+                                                id="description"
+                                                value={formData.description}
+                                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                placeholder="Brief description"
+                                                rows={2}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label htmlFor="selectedElearning" className="text-sm font-medium">
+                                                    Knowledge Base
+                                                </label>
+                                                <Select value={formData.selectedElearningId} onValueChange={(value) => setFormData({ ...formData, selectedElearningId: value })}>
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Select e-learning content (optional)" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {elearningContents.map((content) => (
+                                                            <SelectItem key={content.id} value={content.id}>
+                                                                {content.title}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label htmlFor="difficulty" className="text-sm font-medium">
+                                                    Difficulty
+                                                </label>
+                                                <Select value={formData.difficulty} onValueChange={(value: "beginner" | "intermediate" | "advanced") => setFormData({ ...formData, difficulty: value })}>
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="beginner">Beginner</SelectItem>
+                                                        <SelectItem value="intermediate">Intermediate</SelectItem>
+                                                        <SelectItem value="advanced">Advanced</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label htmlFor="time_limit" className="text-sm font-medium">
+                                                    Time Limit (minutes)
+                                                </label>
+                                                <Input
+                                                    id="time_limit"
+                                                    type="number"
+                                                    value={formData.time_limit}
+                                                    onChange={(e) => setFormData({ ...formData, time_limit: parseInt(e.target.value) || 10 })}
+                                                    min="1"
+                                                    max="60"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label htmlFor="question_count" className="text-sm font-medium">
+                                                    Question Count
+                                                </label>
+                                                <Input
+                                                    id="question_count"
+                                                    type="number"
+                                                    value={formData.question_count}
+                                                    onChange={(e) => setFormData({ ...formData, question_count: parseInt(e.target.value) || (formData.type === "challenge" ? 5 : 5) })}
+                                                    min="1"
+                                                    max={formData.type === "challenge" ? 5 : 20}
+                                                />
+                                            </div>
+                                            <div className="space-y-2 md:col-span-1">
+                                                {/* Empty for alignment */}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <DialogFooter>
@@ -690,7 +832,7 @@ Return ONLY a valid JSON array with no additional text. Format:
                                         </div>
                                         <div>
                                             <h3 className="font-medium text-gray-900 dark:text-white">
-                                                {content.title}
+                                                {content.title} - {content.topic}
                                             </h3>
                                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 {content.description}

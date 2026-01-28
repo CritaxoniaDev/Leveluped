@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { ArrowLeft, FileQuestion, Trophy, CheckCircle } from "lucide-react"
+import { CodeBlock, dracula } from 'react-code-blocks'
 
 interface ResourceContent {
     id: string
@@ -57,6 +58,24 @@ export default function ViewResourceContent() {
             setLoading(false)
         }
     }
+
+    const renderFillInBlank = (question: string) => {
+        const parts = question.split('[BLANK]');
+        return parts.map((part, index) => (
+            <span key={index}>
+                {part}
+                {index < parts.length - 1 && (
+                    <input
+                        type="text"
+                        className="underline border-none bg-transparent mx-1 px-1"
+                        style={{ width: '120px', minWidth: '60px' }}
+                        placeholder="_____"
+                        readOnly
+                    />
+                )}
+            </span>
+        ));
+    };
 
     const getStatusBadgeVariant = (status: string) => {
         switch (status) {
@@ -120,7 +139,7 @@ export default function ViewResourceContent() {
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    {resourceContent.title}
+                                    {resourceContent.title} - {resourceContent.topic}
                                 </h1>
                                 <Badge variant={getStatusBadgeVariant(resourceContent.status)} className="capitalize">
                                     {resourceContent.status}
@@ -185,11 +204,10 @@ export default function ViewResourceContent() {
                                                             return (
                                                                 <div
                                                                     key={optionIndex}
-                                                                    className={`flex items-center gap-2 p-2 rounded ${
-                                                                        isCorrect
-                                                                            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                                                                            : 'bg-gray-50 dark:bg-gray-800'
-                                                                    }`}
+                                                                    className={`flex items-center gap-2 p-2 rounded ${isCorrect
+                                                                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                                                                        : 'bg-gray-50 dark:bg-gray-800'
+                                                                        }`}
                                                                 >
                                                                     <span className={`font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
                                                                         {optionLetter}.
@@ -207,12 +225,34 @@ export default function ViewResourceContent() {
                                                 </div>
                                             ) : (
                                                 <div>
-                                                    <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-                                                        Challenge {index + 1}
+                                                    <h3 className="font-medium text-gray-900 dark:text-white mb-3">
+                                                        {renderFillInBlank(item.question)}
                                                     </h3>
-                                                    <p className="text-gray-700 dark:text-gray-300">
-                                                        {item.challenge || item.question}
-                                                    </p>
+                                                    <div className="space-y-3">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Answer:</p>
+                                                            <p className="text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                                                                {item.answer}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Explanation:</p>
+                                                            <p className="text-gray-600 dark:text-gray-400">
+                                                                {item.explanation}
+                                                            </p>
+                                                        </div>
+                                                        {item.code_example && (
+                                                            <div>
+                                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Code Example:</p>
+                                                                <CodeBlock
+                                                                    text={item.code_example.replace(/```javascript\n|```\n?/g, '')}
+                                                                    language="javascript"
+                                                                    theme={dracula}
+                                                                    showLineNumbers={true}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

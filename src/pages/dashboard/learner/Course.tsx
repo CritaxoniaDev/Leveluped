@@ -115,11 +115,21 @@ export default function Course() {
                 instructor_name: (courseData.users as any)?.name || "Unknown Instructor"
             })
 
-            setEnrollment(enrollmentData)
-
-            // Fetch resource contents
+            // Fetch resource contents and elearning contents
             await fetchResourceContents()
             await fetchElearningContents()
+
+            // Calculate overall progress
+            await calculateAndUpdateProgress(session.user.id, enrollmentData.id)
+
+            // Refetch enrollment to get updated progress
+            const { data: updatedEnrollment } = await supabase
+                .from("enrollments")
+                .select("*")
+                .eq("id", enrollmentData.id)
+                .single()
+
+            setEnrollment(updatedEnrollment)
         } catch (error: any) {
             console.error("Error fetching course data:", error)
             toast.error("Error", {
@@ -128,6 +138,73 @@ export default function Course() {
             navigate("/dashboard/learner")
         } finally {
             setLoading(false)
+        }
+    }
+
+    const calculateAndUpdateProgress = async (userId: string, enrollmentId: string) => {
+        try {
+            // Get total resource contents
+            const { data: resources } = await supabase
+                .from("resource_content")
+                .select("id")
+                .eq("course_id", id)
+                .eq("status", "published")
+
+            const totalResources = resources?.length || 0
+
+            // Get completed resource attempts
+            const { data: completedAttempts } = await supabase
+                .from("resource_attempts")
+                .select("resource_content_id")
+                .eq("user_id", userId)
+                .eq("status", "completed")
+                .in("resource_content_id", resources?.map(r => r.id) || [])
+
+            const completedResources = new Set(completedAttempts?.map(a => a.resource_content_id)).size
+
+            // Get total e-learning sections
+            const { data: elearnings } = await supabase
+                .from("elearning_content")
+                .select("id, content")
+                .eq("course_id", id)
+
+            let totalElearningSections = 0
+            elearnings?.forEach(e => {
+                totalElearningSections += e.content.sections?.length || 0
+            })
+
+            // Get completed e-learning sections
+            let completedElearningSections = 0
+            for (const elearning of elearnings || []) {
+                const { data: progress } = await supabase
+                    .from("elearning_progress")
+                    .select("completed_sections")
+                    .eq("user_id", userId)
+                    .eq("elearning_content_id", elearning.id)
+                    .single()
+
+                if (progress) {
+                    completedElearningSections += progress.completed_sections.length
+                }
+            }
+
+            // Calculate overall progress
+            const totalActivities = totalResources + totalElearningSections
+            const completedActivities = completedResources + completedElearningSections
+            const progressPercentage = totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0
+
+            // Update enrollment
+            const { error } = await supabase
+                .from("enrollments")
+                .update({
+                    progress_percentage: progressPercentage,
+                    completed_at: progressPercentage === 100 ? new Date().toISOString() : null
+                })
+                .eq("id", enrollmentId)
+
+            if (error) throw error
+        } catch (error) {
+            console.error("Error calculating progress:", error)
         }
     }
 
@@ -204,7 +281,7 @@ export default function Course() {
 
     return (
         <div className="dark:from-[#18181b] dark:to-[#27272a]">
-            <div className="mx-auto px-4 py-8">
+            <div className="mx-auto px-4">
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
                     <Button variant="ghost" onClick={() => navigate("/dashboard/learner")}>
@@ -357,7 +434,7 @@ export default function Course() {
 
                 {/* E-Learning Content */}
                 {elearningContents.length > 0 && (
-                    <Card>
+                    <Card className="mt-10">
                         <CardHeader>
                             <CardTitle>E-Learning Materials</CardTitle>
                             <CardDescription>

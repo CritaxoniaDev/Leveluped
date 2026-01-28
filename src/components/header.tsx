@@ -1,81 +1,344 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
-import { Menu, LogOut, User } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
+import { LogOut, User, Crown, Zap } from "lucide-react"
+import {
+    NavigationMenu,
+    NavigationMenuList,
+    NavigationMenuItem,
+    NavigationMenuLink,
+} from "@/components/ui/navigation-menu"
 
 interface HeaderProps {
-    onMenuClick?: () => void
-    userName?: string
-    userRole?: string
+    userName: string
+    userRole: string
+    userLevel?: number | null
+    menuItems?: { icon: any, label: string, href: string }[]
+    isFloating?: boolean
 }
 
-export function Header({ onMenuClick, userName, userRole }: HeaderProps) {
-    const navigate = useNavigate()
-    const [loading, setLoading] = useState(false)
+const AVATAR_BORDERS = [
+    { id: 'none', name: 'None', image: null },
+    { id: 'Border 1', name: 'Border 1', image: '/images/avatar-border/avatar-4.png' },
+    { id: 'Border 2', name: 'Border 2', image: '/images/avatar-border/avatar-1.png' },
+    { id: 'Border 3', name: 'Border 3', image: '/images/avatar-border/avatar-5.png' },
+    { id: 'Border 4', name: 'Border 4', image: '/images/avatar-border/avatar-6.png' },
+]
 
-    const handleLogout = async () => {
-        setLoading(true)
-        try {
-            const { error } = await supabase.auth.signOut()
-            if (error) throw error
-            
-            toast.success("Logged out", {
-                description: "You have been logged out successfully"
-            })
-            navigate("/login")
-        } catch (err: any) {
-            toast.error("Logout failed", {
-                description: err.message
-            })
-        } finally {
-            setLoading(false)
+export function Header({ userName, userRole, userLevel, menuItems, isFloating = false }: HeaderProps) {
+    const navigate = useNavigate()
+    const [isLoggingOut, setIsLoggingOut] = useState(false)
+    const [userXP, setUserXP] = useState({ current: 0, required: 0, total: 0 })
+    const [progressPercentage, setProgressPercentage] = useState(0)
+    const [currentLevel, setCurrentLevel] = useState(userLevel || 1)
+    const [userAvatarBorder, setUserAvatarBorder] = useState<string | null>(null)
+    const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (userRole === 'learner' && userLevel) {
+            fetchLearnerXP()
+            fetchUserAvatar()
+            setupRealtimeSubscription()
+        }
+    }, [userRole, userLevel])
+
+    const getUserId = async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        return session?.user?.id || null
+    }
+
+    const handleProfileClick = async () => {
+        const userId = await getUserId()
+        if (userId) {
+            navigate(`/dashboard/${userRole}/profile/${userId}`)
         }
     }
 
+    const fetchUserAvatar = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return
+
+            const { data: userProfile, error } = await supabase
+                .from("users")
+                .select("avatar_border, avatar_url")
+                .eq("id", session.user.id)
+                .single()
+
+            if (error) throw error
+
+            if (userProfile) {
+                setUserAvatarBorder(userProfile.avatar_border)
+                setUserAvatarUrl(userProfile.avatar_url)
+            }
+        } catch (error) {
+            console.error("Error fetching avatar:", error)
+        }
+    }
+
+    const getSelectedBorderImage = () => {
+        const border = AVATAR_BORDERS.find(b => b.id === userAvatarBorder)
+        return border?.image || undefined
+    }
+
+    const getXPForLevel = (level: number): number => {
+        let xpRequired = 0
+        for (let i = 1; i < level; i++) {
+            xpRequired += 60 + (i - 1) * 15
+        }
+        return xpRequired
+    }
+
+    const getXPRequiredForNextLevel = (currentLevel: number): number => {
+        return 60 + (currentLevel - 1) * 15
+    }
+
+    const setupRealtimeSubscription = async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session || userRole !== 'learner') return
+
+        let channel: any = null
+
+        const startSubscription = async () => {
+            channel = supabase.channel(`header_stats_${session.user.id}`)
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'user_stats',
+                    filter: `user_id=eq.${session.user.id}`
+                }, (payload) => {
+                    const newStats = payload.new as any
+                    if (newStats) {
+                        setCurrentLevel(newStats.current_level)
+                        updateXPDisplay(newStats.total_xp, newStats.current_level)
+                    }
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'users',
+                    filter: `id=eq.${session.user.id}`
+                }, (payload) => {
+                    const updatedUser = payload.new as any
+                    if (updatedUser) {
+                        if (updatedUser.avatar_border !== undefined) {
+                            setUserAvatarBorder(updatedUser.avatar_border)
+                        }
+                        if (updatedUser.avatar_url !== undefined) {
+                            setUserAvatarUrl(updatedUser.avatar_url)
+                        }
+                    }
+                })
+                .subscribe()
+        }
+
+        await startSubscription()
+
+        return () => {
+            if (channel) {
+                supabase.removeChannel(channel)
+            }
+        }
+    }
+
+    const updateXPDisplay = (totalXP: number, level: number) => {
+        const xpForCurrentLevel = getXPForLevel(level)
+        const xpRequiredForNextLevel = getXPRequiredForNextLevel(level)
+        const currentLevelXP = totalXP - xpForCurrentLevel
+
+        setUserXP({
+            current: currentLevelXP,
+            required: xpRequiredForNextLevel,
+            total: totalXP
+        })
+
+        const percentage = (currentLevelXP / xpRequiredForNextLevel) * 100
+        setProgressPercentage(Math.min(percentage, 100))
+    }
+
+    const fetchLearnerXP = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return
+
+            const { data: stats, error } = await supabase
+                .from("user_stats")
+                .select("total_xp, current_level")
+                .eq("user_id", session.user.id)
+                .single()
+
+            if (error) throw error
+
+            if (stats) {
+                setCurrentLevel(stats.current_level)
+                updateXPDisplay(stats.total_xp, stats.current_level)
+            }
+        } catch (error) {
+            console.error("Error fetching XP:", error)
+        }
+    }
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true)
+        try {
+            const { error } = await supabase.auth.signOut()
+            if (error) throw error
+            toast.success("Logged out successfully")
+            navigate("/")
+        } catch (error: any) {
+            toast.error("Error logging out", {
+                description: error.message
+            })
+        } finally {
+            setIsLoggingOut(false)
+        }
+    }
+
+    const getRoleColor = (role: string) => {
+        switch (role) {
+            case 'admin':
+                return 'bg-red-500'
+            case 'instructor':
+                return 'bg-blue-500'
+            case 'learner':
+                return 'bg-green-500'
+            default:
+                return 'bg-gray-500'
+        }
+    }
+
+    const headerClass = isFloating
+        ? "fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-6xl rounded-xl shadow-lg backdrop-blur-md bg-white/85 dark:bg-gray-900/85 border border-gray-200/50 dark:border-gray-700/50"
+        : "bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800"
+
+    const paddingClass = isFloating ? "px-5 py-2.5" : "px-6 py-4"
+
     return (
-        <header className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
-            <div className="flex items-center justify-between h-16 px-6">
-                <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onMenuClick}
-                        className="lg:hidden"
-                    >
-                        <Menu className="w-5 h-5" />
-                    </Button>
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+        <header className={`${headerClass} ${paddingClass}`}>
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                    <h1 className="text-lg font-bold text-gray-900 dark:text-white head-font whitespace-nowrap">
                         LevelUpED
                     </h1>
+                    {menuItems && menuItems.length > 0 && (
+                        <nav className="hidden md:flex">
+                            <NavigationMenu>
+                                <NavigationMenuList>
+                                    {menuItems.map((item, index) => {
+                                        const Icon = item.icon
+                                        return (
+                                            <NavigationMenuItem key={`${item.href}-${index}`}>
+                                                <NavigationMenuLink
+                                                    href={item.href}
+                                                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors whitespace-nowrap"
+                                                >
+                                                    <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                                                    <span className="hidden lg:inline">{item.label}</span>
+                                                </NavigationMenuLink>
+                                            </NavigationMenuItem>
+                                        )
+                                    })}
+                                </NavigationMenuList>
+                            </NavigationMenu>
+                        </nav>
+                    )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                    {userName && (
-                        <div className="text-right hidden sm:block">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                {userName}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                                {userRole}
-                            </p>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    {userRole === 'learner' && currentLevel && (
+                        <div className="hidden sm:flex items-center gap-2 min-w-[180px]">
+                            <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 flex-shrink-0">
+                                <Crown className="w-3 h-3" />
+                                <span>Level {currentLevel}</span>
+                            </Badge>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1 mb-0.5">
+                                    <Zap className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+                                    <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                                        {userXP.current}/{userXP.required} XP
+                                    </span>
+                                </div>
+                                <Progress value={progressPercentage} className="h-1.5" />
+                            </div>
                         </div>
                     )}
 
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
-                    </div>
+                    {userRole === 'learner' && currentLevel && (
+                        <div className="sm:hidden">
+                            <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5">
+                                <Crown className="w-3 h-3" />
+                                <span>{currentLevel}</span>
+                            </Badge>
+                        </div>
+                    )}
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleLogout}
-                        disabled={loading}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400"
-                    >
-                        <LogOut className="w-5 h-5" />
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="relative h-7 w-7 rounded-full p-0 flex-shrink-0">
+                                <div className="relative w-7 h-7">
+                                    <Avatar className="h-7 w-7">
+                                        <AvatarImage src={userAvatarUrl || undefined} alt={userName} />
+                                        <AvatarFallback className={`${getRoleColor(userRole)} text-white text-xs font-bold`}>
+                                            {userName.charAt(0).toUpperCase()}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    {/* Avatar Border Overlay */}
+                                    {getSelectedBorderImage() && (
+                                        <img
+                                            src={getSelectedBorderImage() as string}
+                                            alt="Avatar Border"
+                                            className="absolute inset-0 w-full h-full pointer-events-none scale-150 rounded-full"
+                                        />
+                                    )}
+                                </div>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-48 sm:w-56" align="end" forceMount>
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-xs sm:text-sm font-medium leading-none truncate">{userName}</p>
+                                    <p className="text-xs leading-none text-muted-foreground capitalize">
+                                        {userRole}
+                                    </p>
+                                    {userRole === 'learner' && currentLevel && (
+                                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[10px] text-gray-600 dark:text-gray-400">Level {currentLevel}</span>
+                                                <span className="text-[10px] text-gray-600 dark:text-gray-400">{userXP.current}/{userXP.required} XP</span>
+                                            </div>
+                                            <Progress value={progressPercentage} className="h-1.5" />
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                                                {Math.max(0, userXP.required - userXP.current)} XP to next level
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleProfileClick} className="text-xs sm:text-sm">
+                                <User className="mr-2 h-3.5 w-3.5" />
+                                <span>Profile</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="text-xs sm:text-sm">
+                                <LogOut className="mr-2 h-3.5 w-3.5" />
+                                <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
         </header>

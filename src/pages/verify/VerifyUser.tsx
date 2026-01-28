@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
 export default function VerifyUser() {
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {

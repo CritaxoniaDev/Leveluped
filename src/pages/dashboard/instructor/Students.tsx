@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { Search, Users, BookOpen, TrendingUp, Calendar, Mail, User } from "lucide-react"
+import { Search, Users, BookOpen, TrendingUp, Calendar, Mail } from "lucide-react"
 
 interface Student {
     id: string
@@ -33,7 +33,7 @@ interface CourseSummary {
 export default function Students() {
     const [students, setStudents] = useState<Student[]>([])
     const [courseSummaries, setCourseSummaries] = useState<CourseSummary[]>([])
-    const [loading, setLoading] = useState(true)
+    const [, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedCourse, setSelectedCourse] = useState<string>("all")
     const [sortBy, setSortBy] = useState<string>("enrolled_at")

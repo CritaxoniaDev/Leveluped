@@ -171,6 +171,9 @@ export default function TakeResourceContent() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         await supabase.rpc('increment_user_xp', { user_id: session.user.id, xp_amount: xpEarned })
+
+        // Check and award badges
+        await checkAndAwardBadges(session.user.id, finalScore, questions.length)
       }
 
       setScore(finalScore)
@@ -186,6 +189,72 @@ export default function TakeResourceContent() {
       })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const checkAndAwardBadges = async (userId: string, score: number, totalQuestions: number) => {
+    try {
+      // Check for Perfect Score badge
+      if (score === totalQuestions) {
+        const { data: perfectBadge } = await supabase
+          .from("badges")
+          .select("id")
+          .eq("name", "Perfect Score")
+          .single()
+
+        if (perfectBadge) {
+          const { data: existing } = await supabase
+            .from("user_badges")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("badge_id", perfectBadge.id)
+            .single()
+
+          if (!existing) {
+            await supabase
+              .from("user_badges")
+              .insert({
+                user_id: userId,
+                badge_id: perfectBadge.id
+              })
+            toast.success("Badge Earned!", {
+              description: "Perfect Score!"
+            })
+          }
+        }
+      }
+
+      // Check for Quiz Completed badge (for completing any quiz)
+      const { data: completedBadge } = await supabase
+        .from("badges")
+        .select("id")
+        .eq("name", "Quiz Completed")
+        .single()
+
+      if (completedBadge) {
+        const { data: existing } = await supabase
+          .from("user_badges")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("badge_id", completedBadge.id)
+          .single()
+
+        if (!existing) {
+          await supabase
+            .from("user_badges")
+            .insert({
+              user_id: userId,
+              badge_id: completedBadge.id
+            })
+          toast.success("Badge Earned!", {
+            description: "Quiz Completed!"
+          })
+        }
+      }
+
+      // Add more badge checks as needed, e.g., for high score percentage
+    } catch (error) {
+      console.error("Error checking badges:", error)
     }
   }
 

@@ -1,4 +1,3 @@
-import '@fontsource/google-sans-flex/400.css';
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './App.css'
