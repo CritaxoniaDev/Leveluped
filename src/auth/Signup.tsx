@@ -49,157 +49,58 @@ export default function Signup() {
         e.preventDefault()
         setLoading(true)
 
-        console.log("Starting signup process...")
-
-        // Validate email strictly
+        // Validate inputs
         if (!validateEmail(email)) {
-            console.warn("Email validation failed:", email)
-            toast.error("Invalid Email", {
-                description: "Please enter a valid email address"
-            })
+            toast.error("Invalid Email", { description: "Please enter a valid email address" })
             setLoading(false)
             return
         }
 
-        console.log("Email validation passed:", email)
-
-        // Validate name
         if (!name.trim() || name.trim().length < 2) {
-            console.warn("Name validation failed:", name)
-            toast.error("Invalid Name", {
-                description: "Please enter your full name (at least 2 characters)"
-            })
+            toast.error("Invalid Name", { description: "Please enter your full name" })
             setLoading(false)
             return
         }
 
-        console.log("Name validation passed:", name.trim())
-
-        // Validate username
         if (!validateUsername(username)) {
-            console.warn("Username validation failed:", username)
-            toast.error("Invalid Username", {
-                description: "Username must be 3-20 characters, lowercase, and can only contain letters, numbers, hyphens, and underscores"
-            })
+            toast.error("Invalid Username", { description: "Username must be 3-20 characters" })
             setLoading(false)
             return
         }
-
-        console.log("Username validation passed:", username.toLowerCase())
 
         try {
-            console.log("Checking for existing email and username...")
-
-            // Check if email is taken
-            const { data: existingEmail } = await supabase
-                .from("users")
-                .select("id")
-                .eq("email", email)
-                .single()
-
-            if (existingEmail) {
-                console.warn("Email already exists:", email)
-                toast.error("Email Already Registered", {
-                    description: "This email is already associated with an account. Please log in instead."
-                })
-                setLoading(false)
-                return
-            }
-
-            // Check if username is taken
-            const { data: existingUser } = await supabase
-                .from("users")
-                .select("id")
-                .eq("username", username.toLowerCase())
-                .single()
-
-            if (existingUser) {
-                console.warn("Username already exists:", username.toLowerCase())
-                toast.error("Username Taken", {
-                    description: "This username is already taken. Please choose another one."
-                })
-                setLoading(false)
-                return
-            }
-
-            console.log("No duplicates found, proceeding with signup...")
-
-            // Sign up with OTP
-            console.log("Attempting to sign up with OTP...")
-            console.log("Email:", email)
-            console.log("Username:", username.toLowerCase())
-            console.log("Name:", name.trim())
-
-            const { data, error } = await supabase.auth.signInWithOtp({
-                email,
+            const { error } = await supabase.auth.signInWithOtp({
+                email: email.toLowerCase(),
                 options: {
+                    emailRedirectTo: `${window.location.origin}/verify/user`,
                     data: {
                         name: name.trim(),
-                        username: username.toLowerCase(),
-                        role: 'learner',
-                        is_verified: true
+                        username: username.toLowerCase().trim(),
+                        role: 'learner'
                     }
                 }
             })
 
-            console.log("OTP response:", { data, error })
-
             if (error) {
-                console.error("Sign up error:", error)
-                console.error("Error code:", error.code)
-                console.error("Error message:", error.message)
-                console.error("Error status:", error.status)
-
-                // Handle specific errors
-                if (error.message.includes("User already exists")) {
-                    toast.error("Email Already Registered", {
-                        description: "This email is already associated with an account"
-                    })
-                } else if (error.message.includes("duplicate key")) {
-                    toast.error("Account Already Exists", {
-                        description: "This email or username is already taken"
-                    })
-                } else {
-                    toast.error("Sign Up Failed", {
-                        description: error.message
-                    })
-                }
+                console.error("OTP error:", error)
+                toast.error("Failed to Send Code", {
+                    description: error.message || "Please try again"
+                })
                 setLoading(false)
                 return
             }
 
-            console.log("OTP sent successfully to:", email)
-
-            // Success message
             toast.success("Verification Code Sent!", {
-                description: `Check your email at ${email} for the 6-digit verification code`
+                description: `Check your email at ${email}`
             })
 
-            console.log("Clearing form data...")
-            // Clear form
-            setEmail("")
-            setName("")
-            setUsername("")
-            setEmailError("")
-
-            console.log("Redirecting to OTP input...")
-            // Redirect to OTP input page
             navigate(`/auth/input-otp?email=${encodeURIComponent(email)}`)
 
         } catch (err: any) {
-            console.error("Unexpected signup error:", err)
-            console.error("Error name:", err?.name)
-            console.error("Error message:", err?.message)
-            console.error("Error stack:", err?.stack)
-            console.error("Full error object:", JSON.stringify(err, null, 2))
-
-            toast.error("Error", {
-                description: err?.message || "An unexpected error occurred. Please try again"
-            })
+            console.error("Sign up error:", err)
+            toast.error("Error", { description: "An unexpected error occurred" })
+            setLoading(false)
         }
-
-        setLoading(false)
-        console.log("Signup process finished, loading state set to false")
     }
 
     return (
