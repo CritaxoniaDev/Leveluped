@@ -9,6 +9,8 @@ import {
     BannerTitle,
     BannerClose,
 } from "@/components/ui/shadcn-io/banner"
+import { Map, MapTileLayer, MapMarker, MapPopup, MapTooltip, MapLayers, MapZoomControl, MapLayersControl } from "@/components/ui/map"
+import { MapPinIcon } from "lucide-react"
 import { AuroraText } from "./ui/aurora-text"
 import { useNavigate } from "react-router-dom"
 
@@ -176,12 +178,91 @@ export default function HeroSection({ onSignIn }: HeroSectionProps) {
                     </Button>
                 </div>
 
-                {/* Hero Image */}
-                <img
-                    src="/images/leveluped-dashboard-preview.png"  // Replace with your LMS dashboard image
-                    className="w-full rounded-[15px] max-w-4xl mt-16"
-                    alt="LevelUpED dashboard showcase"
-                />
+                {/* Hero Image - Interactive Map */}
+                <div className="w-full rounded-[15px] max-w-4xl mt-16 overflow-hidden shadow-lg">
+                    <Map
+                        center={[40, -95]}
+                        zoom={4}
+                        className="h-96 rounded-[15px]"
+                    >
+                        <MapLayers defaultTileLayer="Light">
+                            <MapTileLayer name="Light" url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png" />
+                            <MapTileLayer name="Dark" darkUrl="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png" />
+
+                            {/* Sample Course Markers */}
+                            <MapMarker position={[40.7128, -74.0060]} icon={<MapPinIcon className="size-6 text-blue-600" />}>
+                                <MapPopup>
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold">Web Development 101</h3>
+                                        <p className="text-sm text-gray-600">Learn modern web development</p>
+                                        <Button
+                                            onClick={() => navigate('/signup')}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                            size="sm"
+                                        >
+                                            Enroll Now
+                                        </Button>
+                                    </div>
+                                </MapPopup>
+                                <MapTooltip>Web Development 101</MapTooltip>
+                            </MapMarker>
+
+                            <MapMarker position={[34.0522, -118.2437]} icon={<MapPinIcon className="size-6 text-purple-600" />}>
+                                <MapPopup>
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold">Data Science Basics</h3>
+                                        <p className="text-sm text-gray-600">Master data analysis & ML</p>
+                                        <Button
+                                            onClick={() => navigate('/signup')}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                            size="sm"
+                                        >
+                                            Enroll Now
+                                        </Button>
+                                    </div>
+                                </MapPopup>
+                                <MapTooltip>Data Science Basics</MapTooltip>
+                            </MapMarker>
+
+                            <MapMarker position={[41.8781, -87.6298]} icon={<MapPinIcon className="size-6 text-green-600" />}>
+                                <MapPopup>
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold">Python Programming</h3>
+                                        <p className="text-sm text-gray-600">From beginner to advanced</p>
+                                        <Button
+                                            onClick={() => navigate('/signup')}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                            size="sm"
+                                        >
+                                            Enroll Now
+                                        </Button>
+                                    </div>
+                                </MapPopup>
+                                <MapTooltip>Python Programming</MapTooltip>
+                            </MapMarker>
+
+                            <MapMarker position={[37.7749, -122.4194]} icon={<MapPinIcon className="size-6 text-red-600" />}>
+                                <MapPopup>
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold">Cloud Computing</h3>
+                                        <p className="text-sm text-gray-600">AWS, Azure & GCP essentials</p>
+                                        <Button
+                                            onClick={() => navigate('/signup')}
+                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                            size="sm"
+                                        >
+                                            Enroll Now
+                                        </Button>
+                                    </div>
+                                </MapPopup>
+                                <MapTooltip>Cloud Computing</MapTooltip>
+                            </MapMarker>
+
+                            <MapZoomControl />
+                            <MapLayersControl />
+                        </MapLayers>
+                    </Map>
+                </div>
             </main>
         </section>
     )

@@ -12,6 +12,9 @@ import {
   MapTooltip,
   MapZoomControl,
   MapLocateControl,
+  MapLayersControl,
+  MapFullscreenControl,
+  MapLayers,
 } from "@/components/ui/map"
 import {
   Dialog,
@@ -23,12 +26,11 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, Eye, MapPin, BookCopy, Lightbulb, Award, Zap } from "lucide-react"
 import { Polygon, useMap } from 'react-leaflet'
+import { checkAndAwardCourseEnrollmentMilestones, awardBadge } from "@/helpers/achievementHelper"
 
 interface UserStats {
   total_xp: number
   current_level: number
-  badges_count: number
-  leaderboard_rank: number | null
 }
 
 interface CountryLevel {
@@ -171,9 +173,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
   const [stats, setStats] = useState<UserStats>({
     total_xp: 0,
-    current_level: 1,
-    badges_count: 0,
-    leaderboard_rank: null
+    current_level: 1
   })
   const [countryLevels, setCountryLevels] = useState<CountryLevel[]>([])
   const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>([])
@@ -454,6 +454,25 @@ export default function Dashboard() {
       toast.success("Enrolled!", {
         description: "You have successfully enrolled in this course"
       })
+
+      // Check for first enrollment badge
+      const { data: enrollments } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("user_id", session.user.id)
+
+      if (enrollments && enrollments.length === 1) {
+        // This is the first enrollment - award the badge
+        await awardBadge(session.user.id, "First Course Enrollment")
+      }
+
+      // Check for other enrollment milestones
+      await checkAndAwardCourseEnrollmentMilestones(session.user.id)
+
+      // Close the dialog and navigate to the course page
+      setIsCoursesDialogOpen(false)
+      navigate(`/dashboard/learner/course/${courseId}`)
+
     } catch (error: any) {
       console.error("Error enrolling in course:", error)
       toast.error("Error", {
@@ -466,7 +485,7 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from("user_stats")
-        .select("*")
+        .select("total_xp, current_level")
         .eq("user_id", userId)
         .single()
 
@@ -475,9 +494,7 @@ export default function Dashboard() {
       if (data) {
         const statsData: UserStats = {
           total_xp: data.total_xp || 0,
-          current_level: data.current_level || 1,
-          badges_count: data.badges_count || 0,
-          leaderboard_rank: data.leaderboard_rank
+          current_level: data.current_level || 1
         }
         setStats(statsData)
         return statsData
@@ -640,8 +657,8 @@ export default function Dashboard() {
                 <div
                   key={idx}
                   className={`h-1.5 rounded-full transition-all ${idx === introStep
-                      ? 'w-6 bg-blue-600 dark:bg-blue-400'
-                      : 'w-1.5 bg-gray-300 dark:bg-gray-600'
+                    ? 'w-6 bg-blue-600 dark:bg-blue-400'
+                    : 'w-1.5 bg-gray-300 dark:bg-gray-600'
                     }`}
                 />
               ))}
@@ -725,8 +742,17 @@ export default function Dashboard() {
           <HoverContext.Provider value={{ hoveredCountryId, setHoveredCountryId }}>
             <Map center={center} zoom={4} className="h-full w-full">
               <MapTileLayer />
+
+              <MapLayers>
+                <MapTileLayer
+                  url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
+                />
+                <MapLayersControl />
+              </MapLayers>
+
               <MapZoomControl />
-              <MapLocateControl />
+              <MapLocateControl watch={false} />
+              <MapFullscreenControl />
 
               {countryLevels.map((country) => {
                 const polygons = getCountryPolygon(country.base_country!)

@@ -56,6 +56,37 @@ export default function InputOTP() {
                 return
             }
 
+            // Check if user exists in users table, if not create them
+            const { data: existingUser } = await supabase
+                .from("users")
+                .select("id")
+                .eq("id", data.user.id)
+                .maybeSingle()
+
+            if (!existingUser) {
+                // Create user record from auth metadata
+                const metadata = data.user.user_metadata
+                const { error: createUserError } = await supabase
+                    .from("users")
+                    .insert({
+                        id: data.user.id,
+                        email: data.user.email,
+                        name: metadata?.name || '',
+                        username: metadata?.username || data.user.email?.split('@')[0] || '',
+                        role: metadata?.role || 'learner',
+                        is_verified: true
+                    })
+
+                if (createUserError) {
+                    console.error("Error creating user:", createUserError)
+                    toast.error("Error", {
+                        description: "Failed to create user profile"
+                    })
+                    setLoading(false)
+                    return
+                }
+            }
+
             // Generate session token
             const sessionToken = crypto.randomUUID()
             const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days

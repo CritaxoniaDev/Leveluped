@@ -20,6 +20,7 @@ const AVATAR_BORDERS = [
     { id: 'Border 2', name: 'Border 2', image: '/images/avatar-border/avatar-1.png' },
     { id: 'Border 3', name: 'Border 3', image: '/images/avatar-border/avatar-5.png' },
     { id: 'Border 4', name: 'Border 4', image: '/images/avatar-border/avatar-6.png' },
+    { id: 'Border 5', name: 'Border 5', image: '/images/avatar-border/avatar-8.png' },
 ]
 
 export default function Leaderboard() {
@@ -129,7 +130,7 @@ export default function Leaderboard() {
     const restOfLeaderboard = leaderboardData.slice(3)
 
     return (
-        <div className="space-y-8 max-w-6xl mx-auto py-6 px-4">
+        <div className="space-y-8 px-20 mx-auto py-6">
             {/* Header */}
             <div className="space-y-2">
                 <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">

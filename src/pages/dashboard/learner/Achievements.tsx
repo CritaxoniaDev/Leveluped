@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { Trophy, Star, Award, Target, Flame, Brain, Zap, RefreshCw } from "lucide-react"
+import { Trophy, Star, Award, Target, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import {
     checkAllAchievements,
@@ -14,8 +14,6 @@ import {
 interface UserStats {
     total_xp: number
     current_level: number
-    badges_count: number
-    leaderboard_rank: number | null
 }
 
 interface Badge {
@@ -33,18 +31,28 @@ interface UserBadge extends Badge {
     earned_at: string
 }
 
+interface QuestRequirements {
+    lessonsCompleted?: number
+    coursesEnrolled?: number
+    coursesCompleted?: number
+    quizzesCompleted?: number
+    perfectScores?: number
+    streakDays?: number
+    totalXP?: number
+    challengesCompleted?: number
+}
+
 export default function Achievements() {
     const [userStats, setUserStats] = useState<UserStats>({
         total_xp: 0,
-        current_level: 1,
-        badges_count: 0,
-        leaderboard_rank: null
+        current_level: 1
     })
     const [earnedBadges, setEarnedBadges] = useState<UserBadge[]>([])
     const [availableBadges, setAvailableBadges] = useState<Badge[]>([])
     const [loading, setLoading] = useState(true)
     const [claiming, setClaiming] = useState<string | null>(null)
     const [recheckingAchievements, setRecheckingAchievements] = useState(false)
+    const [questProgress, setQuestProgress] = useState<QuestRequirements>({})
 
     const getXPForLevel = (level: number) => {
         if (level <= 1) return 0
@@ -112,6 +120,39 @@ export default function Achievements() {
         }
     }
 
+    const fetchQuestProgress = async (userId: string) => {
+        try {
+            // Fetch lessons completed
+            const { data: lessonsData } = await supabase
+                .from("elearning_progress")
+                .select("id")
+                .eq("user_id", userId)
+                .not("completed_at", "is", null)
+
+            // Fetch courses enrolled
+            const { data: enrollmentsData } = await supabase
+                .from("enrollments")
+                .select("id")
+                .eq("user_id", userId)
+
+            // Fetch completed courses
+            const { data: completedCoursesData } = await supabase
+                .from("enrollments")
+                .select("id")
+                .eq("user_id", userId)
+                .not("completed_at", "is", null)
+
+            setQuestProgress({
+                lessonsCompleted: lessonsData?.length || 0,
+                coursesEnrolled: enrollmentsData?.length || 0,
+                coursesCompleted: completedCoursesData?.length || 0,
+                totalXP: userStats.total_xp
+            })
+        } catch (error) {
+            console.error("Error fetching quest progress:", error)
+        }
+    }
+
     const recheckAllAchievements = async () => {
         try {
             setRecheckingAchievements(true)
@@ -139,76 +180,128 @@ export default function Achievements() {
 
     const fetchAchievements = async () => {
         try {
+            setLoading(true)
             const { data: { session } } = await supabase.auth.getSession()
             if (!session) return
 
-            // Fetch user stats
-            const { data: stats, error: statsError } = await supabase
+            // Use maybeSingle to avoid error when no rows
+            let { data: stats, error: statsError } = await supabase
                 .from("user_stats")
-                .select("*")
+                .select("total_xp, current_level")
                 .eq("user_id", session.user.id)
-                .single()
+                .maybeSingle()
 
-            if (statsError) throw statsError
+            // Check for error first
+            if (statsError) {
+                console.error("Error fetching user stats:", statsError)
+                return
+            }
+
+            // If no stats exist, create them using upsert to avoid duplicate key errors
+            if (!stats) {
+                console.log("No user_stats found, creating new record...")
+                const { data: newStats, error: upsertError } = await supabase
+                    .from("user_stats")
+                    .upsert({
+                        user_id: session.user.id,
+                        total_xp: 0,
+                        current_level: 1
+                    }, {
+                        onConflict: 'user_id'
+                    })
+                    .select()
+                    .single()
+
+                if (upsertError) {
+                    console.error("Error creating user_stats:", upsertError)
+                    // Try to fetch again in case another component created it
+                    const { data: retryStats } = await supabase
+                        .from("user_stats")
+                        .select("total_xp, current_level")
+                        .eq("user_id", session.user.id)
+                        .single()
+
+                    if (retryStats) {
+                        stats = retryStats
+                    } else {
+                        return
+                    }
+                } else {
+                    stats = newStats
+                }
+            }
+
+            // At this point, stats is guaranteed to not be null
+            if (!stats) {
+                console.error("Stats is still null after creation attempt")
+                return
+            }
 
             // Calculate correct level based on XP
             const correctLevel = getLevelFromXP(stats.total_xp)
             if (correctLevel !== stats.current_level) {
                 // Update level in DB
-                const { error: updateError } = await supabase
+                await supabase
                     .from("user_stats")
                     .update({ current_level: correctLevel })
                     .eq("user_id", session.user.id)
 
-                if (updateError) throw updateError
                 stats.current_level = correctLevel
             }
 
-            setUserStats(stats)
+            setUserStats({
+                total_xp: stats.total_xp,
+                current_level: stats.current_level
+            })
 
-            // Fetch earned badges with proper relationship
-            const { data: earned, error: earnedError } = await supabase
-                .from("user_badges")
-                .select(`
-                    earned_at,
-                    badge_id,
-                    badges (
-                        id,
-                        name,
-                        description,
-                        icon,
-                        xp_reward,
-                        level_required,
-                        category
-                    )
-                `)
-                .eq("user_id", session.user.id)
+            // Fetch quest progress
+            await fetchQuestProgress(session.user.id)
 
-            if (earnedError) throw earnedError
-
-            const earnedBadgesData = earned
-                .map((item: any) => ({
-                    ...item.badges,
-                    earned_at: item.earned_at
-                }))
-                .filter((badge: any) => badge && badge.id) // Filter out null values
-
-            setEarnedBadges(earnedBadgesData)
-
-            // Fetch all available badges
+            // Fetch all badges
             const { data: allBadges, error: badgesError } = await supabase
                 .from("badges")
                 .select("*")
-                .order("xp_reward", { ascending: true })
+                .order("level_required", { ascending: true })
 
-            if (badgesError) throw badgesError
-            setAvailableBadges(allBadges || [])
+            if (badgesError) {
+                console.error("Error fetching badges:", badgesError)
+                return
+            }
 
-        } catch (error: any) {
-            console.error("Error fetching achievements:", error)
-            toast.error("Error", {
-                description: "Failed to load achievements"
+            // Fetch user's earned badges
+            const { data: userBadges, error: userBadgesError } = await supabase
+                .from("user_badges")
+                .select("badge_id, earned_at")
+                .eq("user_id", session.user.id)
+
+            if (userBadgesError) {
+                console.error("Error fetching user badges:", userBadgesError)
+                return
+            }
+
+            const earnedBadgeIds = new Set(userBadges?.map(ub => ub.badge_id) || [])
+
+            // Separate earned and available badges
+            const earned: UserBadge[] = []
+            const available: Badge[] = []
+
+            allBadges?.forEach(badge => {
+                if (earnedBadgeIds.has(badge.id)) {
+                    const userBadge = userBadges?.find(ub => ub.badge_id === badge.id)
+                    earned.push({
+                        ...badge,
+                        earned_at: userBadge?.earned_at || ""
+                    })
+                } else {
+                    available.push(badge)
+                }
             })
+
+            setEarnedBadges(earned)
+            setAvailableBadges(available)
+
+        } catch (error) {
+            console.error("Error fetching achievements:", error)
         } finally {
             setLoading(false)
         }
@@ -233,7 +326,15 @@ export default function Achievements() {
             const result = await awardBadge(session.user.id, badge.name, true)
 
             if (result.success) {
-                // Refresh data
+                // Update local state immediately for better UX
+                if (result.newXP !== undefined && result.newLevel !== undefined) {
+                    setUserStats({
+                        total_xp: result.newXP,
+                        current_level: result.newLevel
+                    })
+                }
+
+                // Refresh data from database
                 await fetchAchievements()
             } else {
                 toast.error("Error", {
@@ -250,20 +351,91 @@ export default function Achievements() {
         }
     }
 
-    const getIconForCategory = (category: string) => {
-        switch (category) {
-            case 'achievement':
-                return <Trophy className="w-6 h-6" />
-            case 'academic':
-                return <Brain className="w-6 h-6" />
-            case 'speed':
-                return <Zap className="w-6 h-6" />
-            case 'consistency':
-                return <Flame className="w-6 h-6" />
-            case 'level':
-                return <Star className="w-6 h-6" />
-            default:
-                return <Award className="w-6 h-6" />
+    const getQuestRequirementInfo = (badge: Badge): { requirementText: string; isMet: boolean; progress?: number } => {
+        // Level-based badges
+        if (badge.level_required > 0 && badge.xp_reward === 0) {
+            return {
+                requirementText: `Reach Level ${badge.level_required}`,
+                isMet: userStats.current_level >= badge.level_required,
+                progress: Math.min((userStats.current_level / badge.level_required) * 100, 100)
+            }
+        }
+
+        // Milestone badges (XP-based)
+        if (badge.category === 'milestone') {
+            const xpRequirements: { [key: string]: number } = {
+                'XP Hunter': 1000,
+                'XP Collector': 5000,
+                'XP Master': 10000,
+                'XP Legend': 25000
+            }
+            const required = xpRequirements[badge.name] || 0
+            return {
+                requirementText: `Earn ${required.toLocaleString()} XP`,
+                isMet: userStats.total_xp >= required,
+                progress: Math.min((userStats.total_xp / required) * 100, 100)
+            }
+        }
+
+        // Course completion badges
+        if (badge.name.includes('Course')) {
+            const completionRequirements: { [key: string]: number } = {
+                'Course Rookie': 1,
+                'Course Veteran': 5,
+                'Course Master': 10,
+                'Course Legend': 25
+            }
+            const required = completionRequirements[badge.name] || 0
+            return {
+                requirementText: `Complete ${required} course${required > 1 ? 's' : ''}`,
+                isMet: questProgress.coursesCompleted ? questProgress.coursesCompleted >= required : false,
+                progress: questProgress.coursesCompleted ? Math.min((questProgress.coursesCompleted / required) * 100, 100) : 0
+            }
+        }
+
+        // Course enrollment badges
+        if (badge.name.includes('First Course Enrollment') || badge.name === 'Explorer' || badge.name === 'Adventurer') {
+            const enrollmentRequirements: { [key: string]: number } = {
+                'First Course Enrollment': 1,
+                'Explorer': 3,
+                'Adventurer': 10
+            }
+            const required = enrollmentRequirements[badge.name] || 0
+            return {
+                requirementText: `Enroll in ${required} course${required > 1 ? 's' : ''}`,
+                isMet: questProgress.coursesEnrolled ? questProgress.coursesEnrolled >= required : false,
+                progress: questProgress.coursesEnrolled ? Math.min((questProgress.coursesEnrolled / required) * 100, 100) : 0
+            }
+        }
+
+        // Badge collection badges
+        if (badge.name.includes('Badge')) {
+            const badgeRequirements: { [key: string]: number } = {
+                'Badge Collector': 10,
+                'Badge Hunter': 25,
+                'Badge Legend': 50
+            }
+            const required = badgeRequirements[badge.name] || 0
+            return {
+                requirementText: `Earn ${required} badges`,
+                isMet: earnedBadges.length >= required,
+                progress: Math.min((earnedBadges.length / required) * 100, 100)
+            }
+        }
+
+        // Lesson completion
+        if (badge.name === 'First Steps') {
+            return {
+                requirementText: 'Complete your first lesson',
+                isMet: questProgress.lessonsCompleted ? questProgress.lessonsCompleted >= 1 : false,
+                progress: questProgress.lessonsCompleted ? 100 : 0
+            }
+        }
+
+        // Achievement quests without specific progress tracking
+        return {
+            requirementText: badge.description,
+            isMet: false
         }
     }
 
@@ -287,7 +459,7 @@ export default function Achievements() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 py-6 px-10">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -297,8 +469,8 @@ export default function Achievements() {
                         Track your progress and unlock badges as you learn
                     </p>
                 </div>
-                <Button 
-                    onClick={recheckAllAchievements} 
+                <Button
+                    onClick={recheckAllAchievements}
                     disabled={recheckingAchievements}
                     variant="outline"
                 >
@@ -308,7 +480,7 @@ export default function Achievements() {
             </div>
 
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total XP</CardTitle>
@@ -344,22 +516,7 @@ export default function Achievements() {
                     <CardContent>
                         <div className="text-2xl font-bold">{earnedBadges.length}</div>
                         <p className="text-xs text-muted-foreground">
-                            Out of {availableBadges.length} available
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Leaderboard Rank</CardTitle>
-                        <Trophy className="h-4 w-4 text-orange-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {userStats.leaderboard_rank ? `#${userStats.leaderboard_rank}` : 'N/A'}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            Global ranking
+                            Out of {availableBadges.length + earnedBadges.length} available
                         </p>
                     </CardContent>
                 </Card>
@@ -391,7 +548,7 @@ export default function Achievements() {
                                     <CardContent className="p-4">
                                         <div className="flex items-start gap-3">
                                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-2xl flex-shrink-0">
-                                                {badge.icon || getIconForCategory(badge.category)}
+                                                {badge.icon}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="font-semibold text-gray-900 dark:text-white truncate">
@@ -426,14 +583,14 @@ export default function Achievements() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Target className="w-5 h-5" />
-                        Available Badges ({availableBadges.length - earnedBadges.length})
+                        Available Badges ({availableBadges.length})
                     </CardTitle>
                     <CardDescription>
                         Badges you can still unlock
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {availableBadges.filter(badge => !earnedBadges.some(earned => earned.id === badge.id)).length === 0 ? (
+                    {availableBadges.length === 0 ? (
                         <div className="text-center py-8">
                             <Trophy className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
                             <p className="text-gray-500 dark:text-gray-400">
@@ -442,78 +599,66 @@ export default function Achievements() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {availableBadges
-                                .filter(badge => !earnedBadges.some(earned => earned.id === badge.id))
-                                .map((badge) => {
-                                    const meetsXPRequirement = badge.xp_reward === 0 || userStats.total_xp >= badge.xp_reward
-                                    const meetsLevelRequirement = userStats.current_level >= badge.level_required
-                                    const canClaim = meetsXPRequirement && meetsLevelRequirement
-                                    const progress = badge.xp_reward === 0 ? 100 : Math.min((userStats.total_xp / badge.xp_reward) * 100, 100)
-                                    
-                                    return (
-                                        <Card key={badge.id} className={canClaim ? "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20" : "opacity-60"}>
-                                            <CardContent className="p-4">
-                                                <div className="flex items-start gap-3">
-                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 ${canClaim ? 'bg-gradient-to-br from-yellow-300 to-orange-400' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                                        {badge.icon || getIconForCategory(badge.category)}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                                                            {badge.name}
-                                                        </h3>
-                                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                                                            {badge.description}
-                                                        </p>
-                                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                            {badge.xp_reward > 0 && (
-                                                                <Badge variant="outline" className="text-xs">
-                                                                    {badge.xp_reward} XP
-                                                                </Badge>
-                                                            )}
-                                                            {badge.level_required > 0 && (
-                                                                <Badge variant="outline" className="text-xs">
-                                                                    Level {badge.level_required}+
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        {/* Requirements Status */}
-                                                        <div className="mt-2 space-y-1">
-                                                            {badge.xp_reward > 0 && (
-                                                                <div>
-                                                                    <div className="flex justify-between text-xs mb-1">
-                                                                        <span className={meetsXPRequirement ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}>
-                                                                            XP: {userStats.total_xp}/{badge.xp_reward}
-                                                                        </span>
-                                                                    </div>
-                                                                    <Progress value={progress} className="h-1.5" />
-                                                                </div>
-                                                            )}
-                                                            {badge.level_required > 0 && (
-                                                                <div className="text-xs">
-                                                                    <span className={meetsLevelRequirement ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}>
-                                                                        Level: {userStats.current_level}/{badge.level_required}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        {canClaim && (
-                                                            <Button
-                                                                size="sm"
-                                                                className="mt-2 w-full"
-                                                                onClick={() => claimBadge(badge.id)}
-                                                                disabled={claiming === badge.id}
-                                                            >
-                                                                {claiming === badge.id ? "Claiming..." : "Claim Badge"}
-                                                            </Button>
-                                                        )}
-                                                    </div>
+                            {availableBadges.map((badge) => {
+                                const requirement = getQuestRequirementInfo(badge)
+                                const canClaim = requirement.isMet
+                                const progress = requirement.progress || 0
+
+                                return (
+                                    <Card key={badge.id} className={canClaim ? "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20" : "opacity-60"}>
+                                        <CardContent className="p-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 ${canClaim ? 'bg-gradient-to-br from-yellow-300 to-orange-400' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                                                    {badge.icon}
                                                 </div>
-                                            </CardContent>
-                                        </Card>
-                                    )
-                                })}
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+                                                        {badge.name}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                                        {badge.description}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                        {badge.xp_reward > 0 && (
+                                                            <Badge variant="outline" className="text-xs">
+                                                                +{badge.xp_reward} XP
+                                                            </Badge>
+                                                        )}
+                                                        <Badge variant="outline" className="text-xs capitalize">
+                                                            {badge.category}
+                                                        </Badge>
+                                                    </div>
+
+                                                    {/* Quest Requirements */}
+                                                    <div className="mt-2 space-y-1">
+                                                        <div>
+                                                            <div className="flex justify-between text-xs mb-1">
+                                                                <span className={requirement.isMet ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-400'}>
+                                                                    {requirement.requirementText}
+                                                                </span>
+                                                            </div>
+                                                            {requirement.progress !== undefined && (
+                                                                <Progress value={progress} className="h-1.5" />
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {canClaim && (
+                                                        <Button
+                                                            size="sm"
+                                                            className="mt-2 w-full"
+                                                            onClick={() => claimBadge(badge.id)}
+                                                            disabled={claiming === badge.id}
+                                                        >
+                                                            {claiming === badge.id ? "Claiming..." : "Claim Badge"}
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )
+                            })}
                         </div>
                     )}
                 </CardContent>

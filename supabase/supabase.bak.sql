@@ -1,6 +1,7 @@
 ALTER TABLE users ADD COLUMN avatar_border VARCHAR(50) DEFAULT NULL;
 ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL;
 ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) DEFAULT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- Create an index for faster queries
 CREATE INDEX idx_users_avatar_border ON users(avatar_border);
@@ -164,7 +165,7 @@ CREATE TABLE badges (
     name TEXT NOT NULL,
     description TEXT,
     icon TEXT,
-    xp_required INTEGER DEFAULT 0,
+    xp_reward INTEGER DEFAULT 0,
     category TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -477,3 +478,398 @@ ALTER TABLE countries_levels ADD COLUMN base_country TEXT;
 
 -- Create index
 CREATE INDEX idx_courses_country_id ON courses(country_id);
+
+
+-- Allow authenticated users to read their own avatars
+CREATE POLICY "Users can read their own avatars"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'profile_pictures' 
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- Allow authenticated users to upload avatars
+CREATE POLICY "Users can upload their own avatars"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'profile_pictures'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- Allow authenticated users to update their avatars
+CREATE POLICY "Users can update their own avatars"
+ON storage.objects FOR UPDATE
+USING (
+  bucket_id = 'profile_pictures'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- Allow authenticated users to delete their avatars
+CREATE POLICY "Users can delete their own avatars"
+ON storage.objects FOR DELETE
+USING (
+  bucket_id = 'profile_pictures'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- Create a simple function to update user stats without triggering leaderboard updates
+CREATE OR REPLACE FUNCTION update_user_stats_simple(
+  p_user_id UUID,
+  p_total_xp INTEGER,
+  p_current_level INTEGER
+)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE user_stats 
+  SET 
+    total_xp = p_total_xp,
+    current_level = p_current_level,
+    updated_at = NOW()
+  WHERE user_id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION update_user_stats_simple(UUID, INTEGER, INTEGER) TO authenticated;
+
+
+
+--------------------------------------------------------------------------------------------
+-- Create star_currency table for tracking user stars
+CREATE TABLE star_currency (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    total_stars INTEGER DEFAULT 0,
+    earned_today INTEGER DEFAULT 0,
+    last_login_date DATE,
+    login_streak INTEGER DEFAULT 0,
+    last_streak_reset_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create login_history table to track daily logins
+CREATE TABLE login_history (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    login_date DATE NOT NULL,
+    stars_earned INTEGER DEFAULT 0,
+    streak_bonus_stars INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, login_date)
+);
+
+-- Create indexes for faster queries
+CREATE INDEX idx_star_currency_user_id ON star_currency(user_id);
+CREATE INDEX idx_login_history_user_id ON login_history(user_id);
+CREATE INDEX idx_login_history_login_date ON login_history(login_date);
+
+-- Enable RLS
+ALTER TABLE star_currency ENABLE ROW LEVEL SECURITY;
+ALTER TABLE login_history ENABLE ROW LEVEL SECURITY;
+
+-- Policies for star_currency
+CREATE POLICY "Users can view their own star currency" ON star_currency 
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own star currency" ON star_currency 
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Policies for login_history
+CREATE POLICY "Users can view their own login history" ON login_history 
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own login history" ON login_history 
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Function to initialize star currency on user creation
+CREATE OR REPLACE FUNCTION initialize_star_currency()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO star_currency (user_id) VALUES (NEW.id)
+    ON CONFLICT (user_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to create star currency on user creation
+DROP TRIGGER IF EXISTS create_star_currency_trigger ON users;
+CREATE TRIGGER create_star_currency_trigger
+    AFTER INSERT ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION initialize_star_currency();
+
+-- Function to handle daily login and streak
+CREATE OR REPLACE FUNCTION handle_daily_login(p_user_id UUID)
+RETURNS TABLE(
+    total_stars INTEGER,
+    login_streak INTEGER,
+    stars_earned_today INTEGER,
+    streak_bonus_earned BOOLEAN,
+    streak_milestone_reached INTEGER
+) AS $$
+DECLARE
+    v_last_login_date DATE;
+    v_current_streak INTEGER;
+    v_base_stars INTEGER := 10;
+    v_streak_bonus_stars INTEGER := 0;
+    v_total_earned INTEGER := 0;
+    v_streak_milestone INTEGER := 0;
+    v_today DATE := CURRENT_DATE;
+BEGIN
+    -- Get current streak info
+    SELECT login_streak, last_login_date INTO v_current_streak, v_last_login_date
+    FROM star_currency
+    WHERE user_id = p_user_id;
+
+    -- Check if already logged in today
+    IF EXISTS (
+        SELECT 1 FROM login_history 
+        WHERE user_id = p_user_id AND login_date = v_today
+    ) THEN
+        -- Already logged in today, just return current stats
+        SELECT total_stars, login_streak, earned_today, 0, 0
+        INTO total_stars, login_streak, stars_earned_today, streak_bonus_earned, streak_milestone_reached
+        FROM star_currency
+        WHERE user_id = p_user_id;
+        RETURN NEXT;
+        RETURN;
+    END IF;
+
+    -- Calculate streak
+    IF v_last_login_date IS NULL THEN
+        -- First login
+        v_current_streak := 1;
+    ELSIF v_last_login_date = v_today - INTERVAL '1 day' THEN
+        -- Consecutive day login
+        v_current_streak := v_current_streak + 1;
+    ELSIF v_last_login_date < v_today - INTERVAL '1 day' THEN
+        -- Streak broken, reset
+        v_current_streak := 1;
+    ELSE
+        -- Same day login, don't increment
+        v_current_streak := v_current_streak;
+    END IF;
+
+    -- Calculate streak bonus
+    IF v_current_streak >= 14 THEN
+        v_streak_bonus_stars := 50;
+        v_streak_milestone := 14;
+    ELSIF v_current_streak >= 7 THEN
+        v_streak_bonus_stars := 25;
+        v_streak_milestone := 7;
+    ELSIF v_current_streak >= 3 THEN
+        v_streak_bonus_stars := 10;
+        v_streak_milestone := 3;
+    END IF;
+
+    v_total_earned := v_base_stars + v_streak_bonus_stars;
+
+    -- Update star_currency
+    UPDATE star_currency
+    SET 
+        total_stars = total_stars + v_total_earned,
+        earned_today = v_total_earned,
+        last_login_date = v_today,
+        login_streak = v_current_streak,
+        updated_at = NOW()
+    WHERE user_id = p_user_id;
+
+    -- Record login history
+    INSERT INTO login_history (user_id, login_date, stars_earned, streak_bonus_stars)
+    VALUES (p_user_id, v_today, v_base_stars, v_streak_bonus_stars);
+
+    -- Return results
+    SELECT 
+        total_stars,
+        login_streak,
+        v_total_earned,
+        (v_streak_bonus_stars > 0),
+        v_streak_milestone
+    INTO 
+        total_stars,
+        login_streak,
+        stars_earned_today,
+        streak_bonus_earned,
+        streak_milestone_reached
+    FROM star_currency
+    WHERE user_id = p_user_id;
+
+    RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION handle_daily_login(UUID) TO authenticated;
+
+
+---------------------------------------------------------------------
+
+
+-- Create messages table for instructor-learner communication
+CREATE TABLE messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    read_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create conversations table to group messages
+CREATE TABLE conversations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    participant_1_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    participant_2_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    last_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
+    last_message_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(participant_1_id, participant_2_id),
+    CHECK (participant_1_id < participant_2_id)
+);
+
+-- Create indexes for faster queries
+CREATE INDEX idx_messages_sender_id ON messages(sender_id);
+CREATE INDEX idx_messages_recipient_id ON messages(recipient_id);
+CREATE INDEX idx_messages_conversation ON messages(sender_id, recipient_id);
+CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
+CREATE INDEX idx_messages_is_read ON messages(is_read);
+CREATE INDEX idx_conversations_participant_1 ON conversations(participant_1_id);
+CREATE INDEX idx_conversations_participant_2 ON conversations(participant_2_id);
+CREATE INDEX idx_conversations_last_message_at ON conversations(last_message_at DESC);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+
+-- Policies for messages
+CREATE POLICY "Users can view messages they sent or received" ON messages
+    FOR SELECT USING (
+        auth.uid() = sender_id OR auth.uid() = recipient_id
+    );
+
+CREATE POLICY "Users can insert their own messages" ON messages
+    FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+CREATE POLICY "Users can update their own messages" ON messages
+    FOR UPDATE USING (auth.uid() = sender_id);
+
+CREATE POLICY "Users can delete their own messages" ON messages
+    FOR DELETE USING (auth.uid() = sender_id);
+
+-- Policies for conversations
+CREATE POLICY "Users can view conversations they are part of" ON conversations
+    FOR SELECT USING (
+        auth.uid() = participant_1_id OR auth.uid() = participant_2_id
+    );
+
+CREATE POLICY "Users can create conversations" ON conversations
+    FOR INSERT WITH CHECK (
+        auth.uid() = participant_1_id OR auth.uid() = participant_2_id
+    );
+
+-- Function to create or get conversation
+CREATE OR REPLACE FUNCTION get_or_create_conversation(
+    p_user_1_id UUID,
+    p_user_2_id UUID
+)
+RETURNS UUID AS $$
+DECLARE
+    v_conversation_id UUID;
+    v_participant_1 UUID;
+    v_participant_2 UUID;
+BEGIN
+    -- Ensure consistent ordering
+    IF p_user_1_id < p_user_2_id THEN
+        v_participant_1 := p_user_1_id;
+        v_participant_2 := p_user_2_id;
+    ELSE
+        v_participant_1 := p_user_2_id;
+        v_participant_2 := p_user_1_id;
+    END IF;
+
+    -- Try to get existing conversation
+    SELECT id INTO v_conversation_id FROM conversations
+    WHERE participant_1_id = v_participant_1 AND participant_2_id = v_participant_2;
+
+    -- If not found, create new one
+    IF v_conversation_id IS NULL THEN
+        INSERT INTO conversations (participant_1_id, participant_2_id)
+        VALUES (v_participant_1, v_participant_2)
+        RETURNING id INTO v_conversation_id;
+    END IF;
+
+    RETURN v_conversation_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to update conversation on new message
+CREATE OR REPLACE FUNCTION update_conversation_on_message()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_conversation_id UUID;
+BEGIN
+    -- Get or create conversation
+    v_conversation_id := get_or_create_conversation(NEW.sender_id, NEW.recipient_id);
+
+    -- Update conversation's last message
+    UPDATE conversations
+    SET last_message_id = NEW.id, last_message_at = NEW.created_at
+    WHERE id = v_conversation_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to update conversation on new message
+CREATE TRIGGER update_conversation_on_new_message
+    AFTER INSERT ON messages
+    FOR EACH ROW
+    EXECUTE FUNCTION update_conversation_on_message();
+
+-- Function to mark messages as read
+CREATE OR REPLACE FUNCTION mark_messages_as_read(
+    p_conversation_id UUID,
+    p_user_id UUID
+)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE messages
+    SET is_read = true, read_at = NOW()
+    WHERE (
+        (sender_id != p_user_id AND recipient_id = p_user_id) OR
+        (sender_id = p_user_id AND recipient_id != p_user_id)
+    )
+    AND is_read = false
+    AND (sender_id, recipient_id) IN (
+        SELECT 
+            CASE WHEN participant_1_id = p_user_id THEN participant_2_id ELSE participant_1_id END,
+            CASE WHEN participant_1_id = p_user_id THEN participant_1_id ELSE participant_2_id END
+        FROM conversations
+        WHERE id = p_conversation_id
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION get_or_create_conversation(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION mark_messages_as_read(UUID, UUID) TO authenticated;
+
+CREATE OR REPLACE VIEW conversations_with_messages AS
+SELECT 
+    c.id,
+    c.participant_1_id,
+    c.participant_2_id,
+    c.last_message_id,
+    c.last_message_at,
+    c.created_at,
+    c.updated_at,
+    m.id as message_id,
+    m.content as message_content,
+    m.sender_id as message_sender_id,
+    m.created_at as message_created_at
+FROM conversations c
+LEFT JOIN messages m ON c.last_message_id = m.id;

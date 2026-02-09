@@ -15,6 +15,8 @@ import Achievements from "@/pages/dashboard/learner/Achievements"
 import LearnerProfile from "@/pages/dashboard/learner/Profile"
 import LearnerViewElearningContent from "@/pages/dashboard/learner/ViewElearningContent"
 import Leaderboard from "@/pages/dashboard/learner/Leaderboard"
+import LearnerSettings from "@/pages/dashboard/learner/Settings"
+import LearnerMessage from "@/pages/dashboard/learner/Message"
 import InstructorDashboard from "@/pages/dashboard/instructor/Dashboard"
 import Courses from "@/pages/dashboard/instructor/Courses"
 import ViewCourse from "@/pages/dashboard/instructor/ViewCourse"
@@ -23,6 +25,8 @@ import InstructorViewElearningContent from "@/pages/dashboard/instructor/ViewEle
 import ViewResourceContent from "@/pages/dashboard/instructor/ViewResourceContent"
 import Students from "@/pages/dashboard/instructor/Students"
 import InstructorProfile from "@/pages/dashboard/instructor/Profile"
+import InstructorSettings from "@/pages/dashboard/instructor/Settings"
+import InstructorMessage from "@/pages/dashboard/instructor/Message"
 import AdminDashboard from "@/pages/dashboard/admin/Dashboard"
 import Users from "@/pages/dashboard/admin/Users"
 import CourseMap from "@/pages/dashboard/admin/CourseMap"
@@ -34,7 +38,6 @@ function AppContent() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Check for auth callback from email verification
     const handleAuthCallback = async () => {
       const hash = window.location.hash
       if (hash) {
@@ -43,7 +46,6 @@ function AppContent() {
           if (error) throw error
 
           if (session) {
-            // Route to verify page which will check role and redirect appropriately
             navigate("/verify/user")
           }
         } catch (err) {
@@ -60,7 +62,7 @@ function AppContent() {
 
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster position="top-right" style={{ fontFamily: "var(--font)" }} />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
@@ -104,6 +106,12 @@ function AppContent() {
           </LayoutDashboard>
         } />
 
+        <Route path="/dashboard/learner/messages" element={
+          <LayoutDashboard allowedRoles={["learner"]}>
+            <LearnerMessage />
+          </LayoutDashboard>
+        } />
+
         <Route path="/dashboard/learner/profile/:id" element={
           <LayoutDashboard allowedRoles={["learner"]}>
             <LearnerProfile />
@@ -140,6 +148,12 @@ function AppContent() {
           </LayoutDashboard>
         } />
 
+        <Route path="/dashboard/learner/settings" element={
+          <LayoutDashboard allowedRoles={["learner"]}>
+            <LearnerSettings />
+          </LayoutDashboard>
+        } />
+
         <Route path="/dashboard/instructor" element={
           <LayoutDashboard allowedRoles={["instructor"]}>
             <InstructorDashboard />
@@ -149,6 +163,18 @@ function AppContent() {
         <Route path="/dashboard/instructor/profile/:id" element={
           <LayoutDashboard allowedRoles={["instructor"]}>
             <InstructorProfile />
+          </LayoutDashboard>
+        } />
+
+        <Route path="/dashboard/instructor/messages" element={
+          <LayoutDashboard allowedRoles={["instructor"]}>
+            <InstructorMessage />
+          </LayoutDashboard>
+        } />
+
+        <Route path="/dashboard/instructor/settings" element={
+          <LayoutDashboard allowedRoles={["instructor"]}>
+            <InstructorSettings />
           </LayoutDashboard>
         } />
 
@@ -226,7 +252,7 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <div className="tracking-tight antialiased">
+      <div className="tracking-tighter antialiased">
         <AppContent />
       </div>
     </Router>

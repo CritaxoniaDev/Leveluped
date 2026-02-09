@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { supabase } from "@/lib/supabase"
 import { Header } from "@/components/header"
@@ -161,13 +161,43 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
     const [, setUser] = useState<any>(null)
     const [userProfile, setUserProfile] = useState<any>(null)
     const [userLevel, setUserLevel] = useState<number | null>(null)
+    const [previousLevel, setPreviousLevel] = useState<number | null>(null)
     const [loading, setLoading] = useState(true)
-    const [achievementsChecked, setAchievementsChecked] = useState(false)
+
+    const fetchUserLevel = useCallback(async (userId: string) => {
+        try {
+            const { data: stats, error } = await supabase
+                .from("user_stats")
+                .select("current_level, total_xp")
+                .eq("user_id", userId)
+                .maybeSingle()
+
+            if (error) {
+                console.error("Error fetching user level:", error)
+                return
+            }
+
+            if (stats) {
+                const newLevel = stats.current_level
+
+                // Check for level up
+                if (previousLevel !== null && newLevel > previousLevel) {
+                    toast.success("Level Up! 🎉", {
+                        description: `Congratulations! You've reached Level ${newLevel}!`
+                    })
+                }
+
+                setUserLevel(newLevel)
+                setPreviousLevel(newLevel)
+            }
+        } catch (error) {
+            console.error("Error in fetchUserLevel:", error)
+        }
+    }, [previousLevel])
 
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                // Get current session
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
                 if (sessionError || !session) {
@@ -177,7 +207,6 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
 
                 setUser(session.user)
 
-                // Get user profile from database
                 const { data: profile, error: profileError } = await supabase
                     .from("users")
                     .select("id, email, name, username, role, is_verified")
@@ -198,19 +227,30 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
                 if (profile.role === 'learner') {
                     const { data: stats } = await supabase
                         .from("user_stats")
-                        .select("current_level")
+                        .select("current_level, total_xp")
                         .eq("user_id", session.user.id)
-                        .single()
+                        .maybeSingle()
 
                     if (stats) {
                         setUserLevel(stats.current_level)
+                        setPreviousLevel(stats.current_level)
+                        // Check and award achievements
+                        await checkAllAchievements(session.user.id)
+                    } else {
+                        // Create initial stats if not exists
+                        const { data: newStats } = await supabase
+                            .from("user_stats")
+                            .upsert({
+                                user_id: session.user.id,
+                                total_xp: 0,
+                                current_level: 1
+                            }, { onConflict: 'user_id' })
+                            .select()
+                            .single()
 
-                        // Check and award achievements only once per session
-                        if (!achievementsChecked) {
-                            // Use comprehensive achievement check
-                            await checkAllAchievements(session.user.id)
-
-                            setAchievementsChecked(true)
+                        if (newStats) {
+                            setUserLevel(newStats.current_level)
+                            setPreviousLevel(newStats.current_level)
                         }
                     }
                 }
@@ -237,14 +277,13 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
 
         fetchUserData()
 
-        // Subscribe to auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (event === "SIGNED_OUT" || !session) {
                     setUser(null)
                     setUserProfile(null)
                     setUserLevel(null)
-                    setAchievementsChecked(false)
+                    setPreviousLevel(null)
                     navigate("/login")
                 }
             }
@@ -253,42 +292,58 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
         return () => {
             subscription?.unsubscribe()
         }
-    }, [navigate, allowedRoles, achievementsChecked])
+    }, [navigate, allowedRoles])
 
     // Subscribe to user stats changes for realtime level updates
     useEffect(() => {
         if (!userProfile || userProfile.role !== 'learner') return
 
         let channel: any = null
+        let pollInterval: any = null
 
-        const setupRealtimeSubscription = async () => {
+        const setupSubscription = async () => {
             const { data: { session } } = await supabase.auth.getSession()
             if (!session) return
 
-            channel = supabase.channel(`user_stats_level_${session.user.id}`)
+            channel = supabase.channel(`layout_user_stats_${session.user.id}_${Date.now()}`)
                 .on('postgres_changes', {
-                    event: 'UPDATE',
+                    event: '*',
                     schema: 'public',
                     table: 'user_stats',
                     filter: `user_id=eq.${session.user.id}`
                 }, (payload) => {
                     const newStats = payload.new as any
-                    if (newStats.current_level && newStats.current_level !== userLevel) {
-                        setUserLevel(newStats.current_level)
-                        // Toast is handled in the Achievements component
+                    if (newStats?.current_level) {
+                        const newLevel = newStats.current_level
+
+                        // Check for level up
+                        if (userLevel !== null && newLevel > userLevel) {
+                            toast.success("Level Up! 🎉", {
+                                description: `Congratulations! You've reached Level ${newLevel}!`
+                            })
+                        }
+
+                        setUserLevel(newLevel)
+                        setPreviousLevel(newLevel)
                     }
                 })
-                .subscribe()
+
+
+            // Poll for updates as backup
+            pollInterval = setInterval(() => {
+                fetchUserLevel(session.user.id)
+            }, 5000)
         }
 
-        setupRealtimeSubscription()
+        setupSubscription()
 
         return () => {
+            if (pollInterval) clearInterval(pollInterval)
             if (channel) {
                 supabase.removeChannel(channel)
             }
         }
-    }, [userProfile, userLevel])
+    }, [userProfile?.id, userProfile?.role, userLevel, fetchUserLevel])
 
     if (loading) {
         return (
@@ -302,13 +357,14 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
     }
 
     const isLearner = userProfile?.role === 'learner'
-    // Check if current page is learner dashboard (where floating header should appear)
     const isLearnerDashboardPage = location.pathname === '/dashboard/learner'
+    const isMessagesPage = location.pathname.includes('/messages')
     const shouldUseFloatingHeader = isLearner && isLearnerDashboardPage
 
     const learnerMenuItems = [
         { icon: LayoutDashboardIcon, label: "Dashboard", href: "/dashboard/learner" },
         { icon: BookOpen, label: "My Courses", href: "/dashboard/learner/my-courses" },
+        { icon: MessageSquare, label: "Messages", href: "/dashboard/learner/messages" },
         { icon: Trophy, label: "Achievements", href: "/dashboard/learner/achievements" },
         { icon: CircleStar, label: "Leaderboards", href: "/dashboard/learner/leaderboard" },
         { icon: Settings, label: "Settings", href: "/dashboard/learner/settings" },
@@ -316,7 +372,6 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
 
     return (
         <div className="flex flex-col w-full h-screen dark:bg-gray-950">
-            {/* Floating Header - Only for learners on dashboard page */}
             {shouldUseFloatingHeader && (
                 <div className="fixed top-0 left-0 right-0 z-50 flex justify-center p-2 sm:p-3 pointer-events-none">
                     <div className="pointer-events-auto w-full">
@@ -331,7 +386,6 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
                 </div>
             )}
 
-            {/* Regular Header - For learners on other pages and for instructors and admins */}
             {!shouldUseFloatingHeader && (
                 <Header
                     userName={userProfile?.name || userProfile?.username}
@@ -342,11 +396,9 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
                 />
             )}
 
-            {/* Main content with conditional sidebar */}
             <div className="flex flex-1 overflow-hidden relative">
                 {!isLearner && (
                     <>
-                        {/* Sidebar */}
                         <div className={`absolute left-0 top-0 h-full z-10 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${state === "expanded" ? "w-60" : "w-16"}`}>
                             <div className={`flex h-full flex-col ${state === "collapsed" ? "pt-12" : ""}`}>
                                 <SidebarContent />
@@ -356,9 +408,8 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
                     </>
                 )}
 
-                {/* Page content */}
                 <main className={`flex-1 overflow-y-auto transition-all duration-300 ${!isLearner ? (state === "expanded" ? "ml-60" : "ml-16") : "ml-0"}`}>
-                    <div className={isLearnerDashboardPage ? "h-full" : isLearner ? "px-10 py-6 h-full overflow-y-auto" : "p-4 sm:p-6 h-full overflow-y-auto"}>
+                    <div className={isLearnerDashboardPage || isMessagesPage ? "h-full" : isLearner ? "h-full overflow-y-auto" : "p-4 sm:p-6 h-full overflow-y-auto"}>
                         {children}
                     </div>
                 </main>

@@ -5,9 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
-import { ArrowLeft, Clock, CheckCircle, XCircle, Trophy, Target, Zap, Star } from "lucide-react"
+import { ArrowLeft, Clock, CheckCircle, XCircle, Trophy, Target, Zap, Star, Code, Lightbulb } from "lucide-react"
+import { CodeBlock, dracula } from 'react-code-blocks'
 
 interface ResourceContent {
   id: string
@@ -21,7 +23,7 @@ interface ResourceContent {
 
 interface Attempt {
   id: string
-  answers: { [key: number]: string }
+  answers: { [key: number]: string | string[] }
   timeRemaining: number
   currentQuestion: number
 }
@@ -36,6 +38,7 @@ export default function TakeResourceContent() {
   const [timeLeft, setTimeLeft] = useState(0)
   const [showResults, setShowResults] = useState(false)
   const [score, setScore] = useState(0)
+  const [showHint, setShowHint] = useState<{ [key: number]: boolean }>({})
 
   useEffect(() => {
     if (id) {
@@ -48,7 +51,7 @@ export default function TakeResourceContent() {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
       return () => clearTimeout(timer)
     } else if (timeLeft === 0 && !showResults && attempt) {
-      handleSubmit(true) // Auto-submit on timeout
+      handleSubmit(true)
     }
   }, [timeLeft, showResults, attempt])
 
@@ -69,34 +72,38 @@ export default function TakeResourceContent() {
 
       if (error) throw error
 
-      setResourceContent(data)
-      setTimeLeft(data.time_limit * 60) // Convert to seconds
+      const sanitizedData = {
+        ...data,
+        content: Array.isArray(data.content) ? data.content : [],
+        quests: Array.isArray(data.quests) ? data.quests : []
+      }
 
-      // Check for existing in-progress attempt
+      setResourceContent(sanitizedData)
+      setTimeLeft((data.time_limit || 10) * 60)
+
       const { data: existingAttempt } = await supabase
         .from("resource_attempts")
         .select("*")
         .eq("user_id", session.user.id)
         .eq("resource_content_id", id)
         .eq("status", "in_progress")
-        .single()
+        .maybeSingle()
 
       if (existingAttempt) {
         setAttempt({
           id: existingAttempt.id,
           answers: existingAttempt.answers || {},
-          timeRemaining: Math.max(0, data.time_limit * 60 - Math.floor((Date.now() - new Date(existingAttempt.started_at).getTime()) / 1000)),
+          timeRemaining: Math.max(0, (data.time_limit || 10) * 60 - Math.floor((Date.now() - new Date(existingAttempt.started_at).getTime()) / 1000)),
           currentQuestion: Object.keys(existingAttempt.answers || {}).length
         })
-        setTimeLeft(Math.max(0, data.time_limit * 60 - Math.floor((Date.now() - new Date(existingAttempt.started_at).getTime()) / 1000)))
+        setTimeLeft(Math.max(0, (data.time_limit || 10) * 60 - Math.floor((Date.now() - new Date(existingAttempt.started_at).getTime()) / 1000)))
       } else {
-        // Create new attempt
         const { data: newAttempt, error: attemptError } = await supabase
           .from("resource_attempts")
           .insert({
             user_id: session.user.id,
             resource_content_id: id,
-            max_score: data.content?.length || 0
+            max_score: sanitizedData.content?.length || 0
           })
           .select()
           .single()
@@ -106,7 +113,7 @@ export default function TakeResourceContent() {
         setAttempt({
           id: newAttempt.id,
           answers: {},
-          timeRemaining: data.time_limit * 60,
+          timeRemaining: (data.time_limit || 10) * 60,
           currentQuestion: 0
         })
       }
@@ -121,17 +128,57 @@ export default function TakeResourceContent() {
     }
   }
 
-  const handleAnswerChange = (questionIndex: number, answer: string) => {
+  const handleAnswerChange = (questionIndex: number, answer: string | string[]) => {
     if (!attempt) return
 
     const newAnswers = { ...attempt.answers, [questionIndex]: answer }
     setAttempt({ ...attempt, answers: newAnswers })
 
-    // Auto-save progress
     supabase
       .from("resource_attempts")
       .update({ answers: newAnswers })
       .eq("id", attempt.id)
+  }
+
+  // Handle fill-in-the-blank answer changes
+  const handleBlankChange = (questionIndex: number, blankIndex: number, value: string) => {
+    if (!attempt) return
+
+    const currentAnswers = attempt.answers[questionIndex] as string[] || []
+    const newBlanks = [...currentAnswers]
+    newBlanks[blankIndex] = value
+
+    handleAnswerChange(questionIndex, newBlanks)
+  }
+
+  // Count blanks in a question
+  const countBlanks = (question: string): number => {
+    return (question.match(/\[BLANK\]/g) || []).length
+  }
+
+  // Render fill-in-the-blank question with input fields
+  const renderFillInBlankQuestion = (question: string, questionIndex: number) => {
+    const parts = question.split('[BLANK]')
+    const currentAnswers = (attempt?.answers[questionIndex] as string[]) || []
+
+    return (
+      <div className="text-xl font-semibold text-gray-900 dark:text-white leading-relaxed">
+        {parts.map((part, index) => (
+          <span key={index}>
+            {part}
+            {index < parts.length - 1 && (
+              <Input
+                type="text"
+                value={currentAnswers[index] || ''}
+                onChange={(e) => handleBlankChange(questionIndex, index, e.target.value)}
+                className="inline-block w-32 sm:w-40 mx-1 px-2 py-1 text-base font-mono border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/30 focus:ring-2 focus:ring-blue-500"
+                placeholder="your answer"
+              />
+            )}
+          </span>
+        ))}
+      </div>
+    )
   }
 
   const handleSubmit = async (timedOut = false) => {
@@ -140,25 +187,41 @@ export default function TakeResourceContent() {
     try {
       setSubmitting(true)
 
-      // Calculate score
       let correctAnswers = 0
       const questions = resourceContent.content || []
 
       questions.forEach((question: any, index: number) => {
-        if (attempt.answers[index] === question.correct_answer) {
-          correctAnswers++
+        if (resourceContent.type === 'quiz') {
+          if (attempt.answers[index] === question.correct_answer) {
+            correctAnswers++
+          }
+        } else {
+          const userAnswers = attempt.answers[index] as string[] || []
+          const correctAnswer = question.answer?.toLowerCase().trim() || ''
+
+          if (countBlanks(question.question) === 1) {
+            if (userAnswers[0]?.toLowerCase().trim() === correctAnswer) {
+              correctAnswers++
+            }
+          } else {
+            const allCorrect = userAnswers.every((ans) =>
+              ans?.toLowerCase().trim() === correctAnswer
+            )
+            if (allCorrect && userAnswers.length > 0) {
+              correctAnswers++
+            }
+          }
         }
       })
 
       const finalScore = correctAnswers
       const xpEarned = resourceContent.quests?.[0]?.xp_reward || 50
 
-      // Update attempt
       const { error } = await supabase
         .from("resource_attempts")
         .update({
           completed_at: new Date().toISOString(),
-          time_taken: resourceContent.time_limit * 60 - timeLeft,
+          time_taken: (resourceContent.time_limit || 10) * 60 - timeLeft,
           score: finalScore,
           status: timedOut ? 'timed_out' : 'completed',
           xp_earned: xpEarned
@@ -167,12 +230,29 @@ export default function TakeResourceContent() {
 
       if (error) throw error
 
-      // Update user stats
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        await supabase.rpc('increment_user_xp', { user_id: session.user.id, xp_amount: xpEarned })
+        // Call the updated increment_user_xp function and check for level up
+        const { data: xpResult, error: xpError } = await supabase
+          .rpc('increment_user_xp', {
+            p_user_id: session.user.id,
+            p_xp_amount: xpEarned
+          })
 
-        // Check and award badges
+        if (xpError) {
+          console.error("Error incrementing XP:", xpError)
+        } else if (xpResult && xpResult.length > 0) {
+          const result = xpResult[0]
+          console.log("XP Result:", result)
+
+          // Check if user leveled up
+          if (result.leveled_up) {
+            toast.success("Level Up! 🎉", {
+              description: `Congratulations! You've reached Level ${result.new_level}!`
+            })
+          }
+        }
+
         await checkAndAwardBadges(session.user.id, finalScore, questions.length)
       }
 
@@ -194,13 +274,12 @@ export default function TakeResourceContent() {
 
   const checkAndAwardBadges = async (userId: string, score: number, totalQuestions: number) => {
     try {
-      // Check for Perfect Score badge
-      if (score === totalQuestions) {
+      if (score === totalQuestions && totalQuestions > 0) {
         const { data: perfectBadge } = await supabase
           .from("badges")
           .select("id")
           .eq("name", "Perfect Score")
-          .single()
+          .maybeSingle()
 
         if (perfectBadge) {
           const { data: existing } = await supabase
@@ -208,7 +287,7 @@ export default function TakeResourceContent() {
             .select("id")
             .eq("user_id", userId)
             .eq("badge_id", perfectBadge.id)
-            .single()
+            .maybeSingle()
 
           if (!existing) {
             await supabase
@@ -224,12 +303,12 @@ export default function TakeResourceContent() {
         }
       }
 
-      // Check for Quiz Completed badge (for completing any quiz)
+      const badgeName = resourceContent?.type === 'quiz' ? "Quiz Completed" : "Challenge Completed"
       const { data: completedBadge } = await supabase
         .from("badges")
         .select("id")
-        .eq("name", "Quiz Completed")
-        .single()
+        .eq("name", badgeName)
+        .maybeSingle()
 
       if (completedBadge) {
         const { data: existing } = await supabase
@@ -237,7 +316,7 @@ export default function TakeResourceContent() {
           .select("id")
           .eq("user_id", userId)
           .eq("badge_id", completedBadge.id)
-          .single()
+          .maybeSingle()
 
         if (!existing) {
           await supabase
@@ -247,12 +326,10 @@ export default function TakeResourceContent() {
               badge_id: completedBadge.id
             })
           toast.success("Badge Earned!", {
-            description: "Quiz Completed!"
+            description: `${badgeName}!`
           })
         }
       }
-
-      // Add more badge checks as needed, e.g., for high score percentage
     } catch (error) {
       console.error("Error checking badges:", error)
     }
@@ -265,15 +342,20 @@ export default function TakeResourceContent() {
   }
 
   const getTimerColor = () => {
-    const percentage = (timeLeft / (resourceContent?.time_limit || 1) / 60) * 100
+    const timeLimit = resourceContent?.time_limit || 10
+    const percentage = (timeLeft / (timeLimit * 60)) * 100
     if (percentage > 50) return "text-green-600"
     if (percentage > 25) return "text-yellow-600"
     return "text-red-600"
   }
 
+  const toggleHint = (index: number) => {
+    setShowHint(prev => ({ ...prev, [index]: !prev[index] }))
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center dark:from-blue-900/20 dark:to-purple-900/20">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="inline-block w-12 h-12 border-4 border-blue-500 border-t-purple-500 rounded-full animate-spin mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400 text-lg">Loading your challenge...</p>
@@ -285,21 +367,51 @@ export default function TakeResourceContent() {
   if (!resourceContent || !attempt) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-600 dark:text-gray-400">Content not found</p>
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Content not found</p>
+          <Button onClick={() => navigate(`/dashboard/learner/course/${courseId}`)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Course
+          </Button>
+        </div>
       </div>
     )
   }
 
+  const questions = resourceContent.content || []
+
+  if (questions.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-8 text-center">
+            <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No Questions Available
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              This {resourceContent.type} doesn't have any questions yet.
+            </p>
+            <Button onClick={() => navigate(`/dashboard/learner/course/${courseId}`)}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Course
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Results Screen
   if (showResults) {
-    const questions = resourceContent.content || []
     const totalQuestions = questions.length
-    const percentage = Math.round((score / totalQuestions) * 100)
+    const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0
     const isExcellent = percentage >= 80
     const isGood = percentage >= 60
 
     return (
-      <div className="dark:from-green-900/20 dark:via-blue-900/20 dark:to-purple-900/20">
-        <div className="px-20 mx-auto py-8">
+      <div className="min-h-screen">
+        <div className="px-4 sm:px-8 lg:px-20 mx-auto py-8">
           <div className="flex items-center gap-4 mb-8">
             <Button variant="ghost" onClick={() => navigate(`/dashboard/learner/course/${courseId}`)} className="hover:bg-white/50">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -344,22 +456,28 @@ export default function TakeResourceContent() {
                 </div>
               </div>
 
-              <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="space-y-4 max-h-[500px] overflow-y-auto">
                 <h3 className="text-xl font-semibold text-center mb-4">Review Your Answers</h3>
                 {questions.map((question: any, index: number) => {
                   const userAnswer = attempt.answers[index]
-                  const isCorrect = userAnswer === question.correct_answer
+                  let isCorrect = false
+
+                  if (resourceContent.type === 'quiz') {
+                    isCorrect = userAnswer === question.correct_answer
+                  } else {
+                    const userAnswers = userAnswer as string[] || []
+                    const correctAnswer = question.answer?.toLowerCase().trim() || ''
+                    isCorrect = userAnswers[0]?.toLowerCase().trim() === correctAnswer
+                  }
 
                   return (
-                    <div key={index} className={`border rounded-lg p-4 transition-all duration-300 ${
-                      isCorrect 
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' 
+                    <div key={index} className={`border rounded-lg p-4 transition-all duration-300 ${isCorrect
+                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
                         : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
-                    }`}>
+                      }`}>
                       <div className="flex items-start gap-3">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                          isCorrect ? 'bg-green-500' : 'bg-red-500'
-                        }`}>
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-500' : 'bg-red-500'
+                          }`}>
                           {isCorrect ? (
                             <CheckCircle className="w-5 h-5 text-white" />
                           ) : (
@@ -367,29 +485,71 @@ export default function TakeResourceContent() {
                           )}
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white mb-3">{question.question}</p>
-                          <div className="space-y-2">
-                            {question.options.map((option: string, optionIndex: number) => {
-                              const optionLetter = String.fromCharCode(65 + optionIndex)
-                              const isUserAnswer = userAnswer === optionLetter
-                              const isCorrectAnswer = question.correct_answer === optionLetter
+                          {resourceContent.type === 'quiz' ? (
+                            <>
+                              <p className="font-medium text-gray-900 dark:text-white mb-3">{question.question}</p>
+                              <div className="space-y-2">
+                                {(question.options || []).map((option: string, optionIndex: number) => {
+                                  const optionLetter = String.fromCharCode(65 + optionIndex)
+                                  const isUserAnswer = userAnswer === optionLetter
+                                  const isCorrectAnswer = question.correct_answer === optionLetter
 
-                              return (
-                                <div
-                                  key={optionIndex}
-                                  className={`p-3 rounded-lg border transition-all duration-200 ${
-                                    isCorrectAnswer
-                                      ? 'border-green-300 bg-green-100 dark:border-green-600 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                                      : isUserAnswer && !isCorrectAnswer
-                                      ? 'border-red-300 bg-red-100 dark:border-red-600 dark:bg-red-900/30 text-red-800 dark:text-red-200'
-                                      : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                                  }`}
-                                >
-                                  <span className="font-medium">{optionLetter}.</span> {option}
+                                  return (
+                                    <div
+                                      key={optionIndex}
+                                      className={`p-3 rounded-lg border transition-all duration-200 ${isCorrectAnswer
+                                          ? 'border-green-300 bg-green-100 dark:border-green-600 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                          : isUserAnswer && !isCorrectAnswer
+                                            ? 'border-red-300 bg-red-100 dark:border-red-600 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                                            : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                                        }`}
+                                    >
+                                      <span className="font-medium">{optionLetter}.</span> {option}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-medium text-gray-900 dark:text-white mb-3">
+                                {question.question.replace(/\[BLANK\]/g, '_____')}
+                              </p>
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your Answer:</p>
+                                  <p className={`p-2 rounded ${isCorrect ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'}`}>
+                                    {(userAnswer as string[])?.[0] || 'No answer provided'}
+                                  </p>
                                 </div>
-                              )
-                            })}
-                          </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Correct Answer:</p>
+                                  <p className="p-2 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium">
+                                    {question.answer}
+                                  </p>
+                                </div>
+                                {question.explanation && (
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Explanation:</p>
+                                    <p className="text-gray-600 dark:text-gray-400 text-sm">
+                                      {question.explanation}
+                                    </p>
+                                  </div>
+                                )}
+                                {question.code_example && (
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Code Example:</p>
+                                    <CodeBlock
+                                      text={question.code_example.replace(/```javascript\n|```\n?/g, '')}
+                                      language="javascript"
+                                      theme={dracula}
+                                      showLineNumbers={true}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -398,14 +558,14 @@ export default function TakeResourceContent() {
               </div>
 
               <div className="flex justify-center gap-4 pt-6 border-t">
-                <Button 
+                <Button
                   onClick={() => navigate(`/dashboard/learner/course/${courseId}`)}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                 >
                   Back to Course
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => window.location.reload()}
                   className="border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                 >
@@ -419,15 +579,52 @@ export default function TakeResourceContent() {
     )
   }
 
-  const questions = resourceContent.content || []
-  const currentQuestion = questions[attempt.currentQuestion]
-  const progress = ((attempt.currentQuestion + 1) / questions.length) * 100
+  // Question Screen
+  const currentQuestionIndex = Math.min(attempt.currentQuestion, questions.length - 1)
+  const currentQuestion = questions[currentQuestionIndex]
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100
+
+  if (!currentQuestion) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-8 text-center">
+            <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Error Loading Question
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              There was an issue loading the question. Please try again.
+            </p>
+            <Button onClick={() => navigate(`/dashboard/learner/course/${courseId}`)}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Course
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const currentOptions = Array.isArray(currentQuestion.options) ? currentQuestion.options : []
+  const isChallenge = resourceContent.type === 'challenge'
+
+  // Check if current question is answered
+  const isCurrentAnswered = () => {
+    const answer = attempt.answers[currentQuestionIndex]
+    if (isChallenge) {
+      const answers = answer as string[] || []
+      const blankCount = countBlanks(currentQuestion.question)
+      return answers.filter(a => a?.trim()).length >= blankCount
+    }
+    return !!answer
+  }
 
   return (
-    <div className="dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20">
-      <div className="px-20 mx-auto py-8">
+    <div className="min-h-screen">
+      <div className="px-4 sm:px-8 lg:px-20 mx-auto py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <Button variant="ghost" onClick={() => navigate(`/dashboard/learner/course/${courseId}`)} className="hover:bg-white/50">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Course
@@ -436,7 +633,7 @@ export default function TakeResourceContent() {
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Time Limit: {resourceContent.time_limit} min
+                Time Limit: {resourceContent.time_limit || 10} min
               </span>
             </div>
             <div className={`flex items-center gap-2 font-mono text-xl font-bold ${getTimerColor()}`}>
@@ -450,24 +647,25 @@ export default function TakeResourceContent() {
         <Card className="mb-8 shadow-lg border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
           <CardContent className="p-6">
             <div className="flex justify-between text-sm mb-3">
-              <span className="font-medium">Question {attempt.currentQuestion + 1} of {questions.length}</span>
+              <span className="font-medium">
+                {isChallenge ? 'Challenge' : 'Question'} {currentQuestionIndex + 1} of {questions.length}
+              </span>
               <span className="font-medium">{Math.round(progress)}% Complete</span>
             </div>
-            <Progress 
-              value={progress} 
-              className="h-3 bg-gray-200 dark:bg-gray-700" 
+            <Progress
+              value={progress}
+              className="h-3 bg-gray-200 dark:bg-gray-700"
             />
             <div className="flex justify-between mt-2">
-              {questions.map((_, index) => (
+              {questions.map((_: any, index: number) => (
                 <div
                   key={index}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                    index < attempt.currentQuestion
+                  className={`w-3 h-3 rounded-full transition-all duration-300 ${index < currentQuestionIndex
                       ? 'bg-green-500'
-                      : index === attempt.currentQuestion
-                      ? 'bg-blue-500 animate-pulse'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
+                      : index === currentQuestionIndex
+                        ? 'bg-blue-500 animate-pulse'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
                 />
               ))}
             </div>
@@ -478,11 +676,11 @@ export default function TakeResourceContent() {
         <Card className="shadow-2xl border-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3 mb-2">
-              <div className={`p-2 rounded-lg ${resourceContent.type === 'quiz' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
-                {resourceContent.type === 'quiz' ? (
-                  <Target className="w-6 h-6 text-blue-600" />
+              <div className={`p-2 rounded-lg ${isChallenge ? 'bg-green-100 dark:bg-green-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                {isChallenge ? (
+                  <Code className="w-6 h-6 text-green-600" />
                 ) : (
-                  <Trophy className="w-6 h-6 text-green-600" />
+                  <Target className="w-6 h-6 text-blue-600" />
                 )}
               </div>
               <div>
@@ -494,68 +692,118 @@ export default function TakeResourceContent() {
             </div>
           </CardHeader>
           <CardContent>
-            {currentQuestion && (
-              <div className="space-y-8">
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 leading-relaxed">
-                    {currentQuestion.question}
-                  </h3>
-                  <RadioGroup
-                    value={attempt.answers[attempt.currentQuestion] || ""}
-                    onValueChange={(value) => handleAnswerChange(attempt.currentQuestion, value)}
-                    className="space-y-3"
-                  >
-                    {currentQuestion.options.map((option: string, index: number) => (
-                      <div key={index} className="flex items-center space-x-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 cursor-pointer">
-                        <RadioGroupItem value={String.fromCharCode(65 + index)} id={`option-${index}`} className="text-blue-600" />
-                        <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-gray-700 dark:text-gray-300 font-medium">
-                          <span className="font-bold text-blue-600 mr-2">{String.fromCharCode(65 + index)}.</span>
-                          {option}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
+            <div className="space-y-8">
+              <div className={`rounded-lg p-6 ${isChallenge ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20' : 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20'}`}>
 
-                <div className="flex justify-between pt-6">
-                  <Button
-                    variant="outline"
-                    onClick={() => setAttempt({ ...attempt, currentQuestion: Math.max(0, attempt.currentQuestion - 1) })}
-                    disabled={attempt.currentQuestion === 0}
-                    className="px-8 py-3 border-2 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    ← Previous
-                  </Button>
-                  {attempt.currentQuestion < questions.length - 1 ? (
-                    <Button
-                      onClick={() => setAttempt({ ...attempt, currentQuestion: attempt.currentQuestion + 1 })}
-                      disabled={!attempt.answers[attempt.currentQuestion]}
-                      className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      Next →
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={() => handleSubmit()} 
-                      disabled={submitting || !attempt.answers[attempt.currentQuestion]}
-                      className="px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      {submitting ? (
-                        <>
-                          <div className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-5 h-5 mr-2" />
-                          Submit Quiz
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
+                {isChallenge ? (
+                  <>
+                    {/* Challenge: Fill in the blank */}
+                    <div className="mb-6">
+                      {renderFillInBlankQuestion(currentQuestion.question, currentQuestionIndex)}
+                    </div>
+
+                    {/* Hint Button */}
+                    {currentQuestion.explanation && (
+                      <div className="mt-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleHint(currentQuestionIndex)}
+                          className="gap-2"
+                        >
+                          <Lightbulb className="w-4 h-4" />
+                          {showHint[currentQuestionIndex] ? 'Hide Hint' : 'Show Hint'}
+                        </Button>
+                        {showHint[currentQuestionIndex] && (
+                          <div className="mt-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                              💡 {currentQuestion.explanation}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Code Example Preview */}
+                    {currentQuestion.code_example && (
+                      <div className="mt-6">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Reference Code:</p>
+                        <CodeBlock
+                          text={currentQuestion.code_example.replace(/```javascript\n|```\n?/g, '')}
+                          language="javascript"
+                          theme={dracula}
+                          showLineNumbers={true}
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Quiz: Multiple choice */}
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6 leading-relaxed">
+                      {currentQuestion.question}
+                    </h3>
+                    {currentOptions.length > 0 ? (
+                      <RadioGroup
+                        value={(attempt.answers[currentQuestionIndex] as string) || ""}
+                        onValueChange={(value) => handleAnswerChange(currentQuestionIndex, value)}
+                        className="space-y-3"
+                      >
+                        {currentOptions.map((option: string, index: number) => (
+                          <div key={index} className="flex items-center space-x-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 cursor-pointer">
+                            <RadioGroupItem value={String.fromCharCode(65 + index)} id={`option-${index}`} className="text-blue-600" />
+                            <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-gray-700 dark:text-gray-300 font-medium">
+                              <span className="font-bold text-blue-600 mr-2">{String.fromCharCode(65 + index)}.</span>
+                              {option}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400">No options available for this question.</p>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+
+              <div className="flex justify-between pt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setAttempt({ ...attempt, currentQuestion: Math.max(0, currentQuestionIndex - 1) })}
+                  disabled={currentQuestionIndex === 0}
+                  className="px-8 py-3 border-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  ← Previous
+                </Button>
+                {currentQuestionIndex < questions.length - 1 ? (
+                  <Button
+                    onClick={() => setAttempt({ ...attempt, currentQuestion: currentQuestionIndex + 1 })}
+                    disabled={!isCurrentAnswered()}
+                    className={`px-8 py-3 shadow-lg hover:shadow-xl transition-all duration-200 ${isChallenge ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'}`}
+                  >
+                    Next →
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => handleSubmit()}
+                    disabled={submitting || !isCurrentAnswered()}
+                    className="px-8 py-3 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Submit {isChallenge ? 'Challenge' : 'Quiz'}
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

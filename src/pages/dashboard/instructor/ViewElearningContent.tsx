@@ -4,6 +4,16 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { ArrowLeft, ExternalLink, BookOpen, Sparkles, Edit, Trash2, Play } from "lucide-react"
 
@@ -41,6 +51,7 @@ export default function ViewElearningContent() {
   const [course, setCourse] = useState<Course | null>(null)
   const [content, setContent] = useState<ElearningContent | null>(null)
   const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (courseId && id) {
@@ -87,9 +98,8 @@ export default function ViewElearningContent() {
   }
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this e-learning content?")) return
-
     try {
+      setDeleting(true)
       const { error } = await supabase
         .from("elearning_content")
         .delete()
@@ -106,6 +116,8 @@ export default function ViewElearningContent() {
       toast.error("Error", {
         description: "Failed to delete content"
       })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -147,10 +159,50 @@ export default function ViewElearningContent() {
             <Edit className="w-4 h-4 mr-2" />
             Edit
           </Button>
-          <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-700">
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete E-Learning Content</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{content.title}"? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  ⚠️ All sections, links, and videos associated with this content will be permanently deleted.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <AlertDialogCancel disabled={deleting}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Content
+                    </>
+                  )}
+                </AlertDialogAction>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 

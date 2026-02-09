@@ -27,6 +27,16 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Globe } from "lucide-react"
@@ -183,6 +193,9 @@ export default function CourseMap() {
     const [geoJsonData, setGeoJsonData] = useState<GeoJsonFeature[]>([])
     const [loading, setLoading] = useState(true)
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+    const [deleteAlertOpen, setDeleteAlertOpen] = useState(false)
+    const [selectedCountryId, setSelectedCountryId] = useState<string | null>(null)
     const [showPolygons, setShowPolygons] = useState(true)
     const [hoveredCountryId, setHoveredCountryId] = useState<string | null>(null)
     const [formData, setFormData] = useState({
@@ -194,6 +207,7 @@ export default function CourseMap() {
         longitude: 0,
     })
     const [creating, setCreating] = useState(false)
+    const [updating, setUpdating] = useState(false)
 
     const countryList: CountryOption[] = countries.map(c => ({
         name: c.name.common,
@@ -325,18 +339,78 @@ export default function CourseMap() {
         }
     }
 
-    const handleDeleteCountry = async (countryId: string) => {
-        if (!confirm("Are you sure you want to delete this country? This will affect courses associated with it.")) return
+    const handleEditCountry = (country: CountryLevel) => {
+        setSelectedCountryId(country.id)
+        setFormData({
+            country_name: country.country_name,
+            base_country: country.base_country || "",
+            min_level: country.min_level,
+            max_level: country.max_level,
+            latitude: country.latitude,
+            longitude: country.longitude,
+        })
+        setIsEditDialogOpen(true)
+    }
+
+    const handleUpdateCountry = async () => {
+        if (!selectedCountryId) return
+
+        try {
+            setUpdating(true)
+
+            const { data, error } = await supabase
+                .from("countries_levels")
+                .update({
+                    country_name: formData.country_name,
+                    min_level: formData.min_level,
+                    max_level: formData.max_level,
+                })
+                .eq("id", selectedCountryId)
+                .select()
+                .single()
+
+            if (error) throw error
+
+            setCountriesData(
+                countriesData.map(c => c.id === selectedCountryId ? data : c)
+            )
+            setFormData({
+                country_name: "",
+                base_country: "",
+                min_level: 1,
+                max_level: 20,
+                latitude: 0,
+                longitude: 0,
+            })
+            setIsEditDialogOpen(false)
+            setSelectedCountryId(null)
+            toast.success("Country updated", {
+                description: "Country level range has been updated successfully"
+            })
+        } catch (error: any) {
+            console.error("Error updating country:", error)
+            toast.error("Error", {
+                description: "Failed to update country"
+            })
+        } finally {
+            setUpdating(false)
+        }
+    }
+
+    const handleDeleteCountry = async () => {
+        if (!selectedCountryId) return
 
         try {
             const { error } = await supabase
                 .from("countries_levels")
                 .delete()
-                .eq("id", countryId)
+                .eq("id", selectedCountryId)
 
             if (error) throw error
 
-            setCountriesData(countriesData.filter(c => c.id !== countryId))
+            setCountriesData(countriesData.filter(c => c.id !== selectedCountryId))
+            setDeleteAlertOpen(false)
+            setSelectedCountryId(null)
             toast.success("Country deleted", {
                 description: "Country has been deleted successfully"
             })
@@ -592,13 +666,20 @@ export default function CourseMap() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
-                                                    <Button variant="ghost" size="sm">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleEditCountry(country)}
+                                                    >
                                                         <Edit className="w-4 h-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => handleDeleteCountry(country.id)}
+                                                        onClick={() => {
+                                                            setSelectedCountryId(country.id)
+                                                            setDeleteAlertOpen(true)
+                                                        }}
                                                         className="text-red-600 hover:text-red-700"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
@@ -613,6 +694,95 @@ export default function CourseMap() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Edit Dialog */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit Country</DialogTitle>
+                        <DialogDescription>
+                            Update the country details and level range.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="edit_country_name" className="text-right text-sm font-medium">
+                                Country Name
+                            </label>
+                            <Input
+                                id="edit_country_name"
+                                value={formData.country_name}
+                                onChange={(e) => setFormData({ ...formData, country_name: e.target.value })}
+                                className="col-span-3"
+                                placeholder="Custom country name"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="edit_base_country" className="text-right text-sm font-medium">
+                                Base Country
+                            </label>
+                            <Input
+                                id="edit_base_country"
+                                disabled
+                                value={formData.base_country}
+                                className="col-span-3 bg-gray-100"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="edit_min_level" className="text-right text-sm font-medium">
+                                Min Level
+                            </label>
+                            <Input
+                                id="edit_min_level"
+                                type="number"
+                                value={formData.min_level}
+                                onChange={(e) => setFormData({ ...formData, min_level: parseInt(e.target.value) || 1 })}
+                                className="col-span-3"
+                                placeholder="1"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label htmlFor="edit_max_level" className="text-right text-sm font-medium">
+                                Max Level
+                            </label>
+                            <Input
+                                id="edit_max_level"
+                                type="number"
+                                value={formData.max_level}
+                                onChange={(e) => setFormData({ ...formData, max_level: parseInt(e.target.value) || 20 })}
+                                className="col-span-3"
+                                placeholder="20"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit" onClick={handleUpdateCountry} disabled={updating || !formData.country_name}>
+                            {updating ? "Updating..." : "Update Country"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Alert Dialog */}
+            <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Country?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the country and affect any courses associated with it.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteCountry}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

@@ -3,13 +3,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  --font: "Geist", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
 body {
-   font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-family: var(--font);
 }
 
 .head-font, h1 {
   font-family: "Instrument Serif", serif !important;
+  letter-spacing: .5px;
 }
 
 .code-sans, code {
