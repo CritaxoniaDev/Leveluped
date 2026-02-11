@@ -2,8 +2,11 @@ import { defineConfig } from 'vite'
 import path from 'path'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { v4 as uuidv4 } from 'uuid'
 
-// https://vite.dev/config/
+// Generate a unique build ID
+const buildId = uuidv4()
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -23,9 +26,9 @@ export default defineConfig({
           'supabase-vendor': ['@supabase/supabase-js'],
           'utils': ['sonner', 'clsx']
         },
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        chunkFileNames: `assets/[name]-v=levelupedv1_${buildId}-[hash].js`,
+        entryFileNames: `assets/[name]-v=levelupedv1_${buildId}-[hash].js`,
+        assetFileNames: `assets/[name]-v=levelupedv1_${buildId}-[hash].[ext]`
       }
     }
   },
