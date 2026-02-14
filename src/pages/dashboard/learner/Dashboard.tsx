@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, createContext, useContext } from "react"
 import { useNavigate } from "react-router-dom"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"

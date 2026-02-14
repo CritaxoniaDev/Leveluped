@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, createContext, useContext } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
 import { useNavigate } from "react-router-dom"
 import {
     Table,

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "sonner"
-import { ArrowLeft, BookOpen, Trophy, Play, CheckCircle, ChevronRight, Clock, Users } from "lucide-react"
+import { ArrowLeft, BookOpen, Trophy, Play, CheckCircle, ChevronRight, Clock, Users, MessageCircle } from "lucide-react"
 
 interface Course {
     id: string
@@ -39,6 +39,7 @@ interface ResourceContent {
 }
 
 interface Enrollment {
+    id: string
     progress_percentage: number
     enrolled_at: string
     completed_at: string | null
@@ -132,7 +133,7 @@ export default function Course() {
                 .single()
 
             setEnrollment(updatedEnrollment)
-            
+
             // Set first module as selected
             if (resourceContents.length > 0) {
                 setSelectedModule(resourceContents[0].id)
@@ -287,8 +288,8 @@ export default function Course() {
             <aside className="sticky top-0 w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
                 {/* Course Info in Sidebar */}
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <Button 
-                        variant="ghost" 
+                    <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => navigate("/dashboard/learner")}
                         className="mb-4 w-full justify-start"
@@ -296,7 +297,7 @@ export default function Course() {
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back
                     </Button>
-                    
+
                     <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 truncate">
                         {course.title}
                     </h2>
@@ -338,11 +339,10 @@ export default function Course() {
                                                         variant={selectedModule === content.id ? "default" : "ghost"}
                                                         size="sm"
                                                         onClick={() => setSelectedModule(content.id)}
-                                                        className={`w-full justify-start text-xs h-9 ${
-                                                            selectedModule === content.id
+                                                        className={`w-full justify-start text-xs h-9 ${selectedModule === content.id
                                                                 ? "bg-blue-600 text-white dark:bg-blue-700"
                                                                 : "text-gray-700 dark:text-gray-300"
-                                                        }`}
+                                                            }`}
                                                     >
                                                         <div className="w-4 h-4 rounded-full flex items-center justify-center mr-2 flex-shrink-0 bg-gray-200 dark:bg-gray-700">
                                                             {isCompleted ? (
@@ -396,6 +396,16 @@ export default function Course() {
                             </div>
                         )}
                     </nav>
+                </div>
+                {/* Feedback Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+                    <Button
+                        onClick={() => navigate(`/dashboard/learner/course/${id}/feedback`)}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Leave Feedback
+                    </Button>
                 </div>
             </aside>
 
@@ -493,20 +503,18 @@ export default function Course() {
                                         const isCompleted = completedModules.has(content.id)
                                         return (
                                             <Card className="border-0 shadow-lg overflow-hidden">
-                                                <div className={`h-2 bg-gradient-to-r ${
-                                                    content.difficulty === 'beginner' ? 'from-green-400 to-green-600' :
-                                                    content.difficulty === 'intermediate' ? 'from-yellow-400 to-yellow-600' :
-                                                    'from-red-400 to-red-600'
-                                                }`}></div>
+                                                <div className={`h-2 bg-gradient-to-r ${content.difficulty === 'beginner' ? 'from-green-400 to-green-600' :
+                                                        content.difficulty === 'intermediate' ? 'from-yellow-400 to-yellow-600' :
+                                                            'from-red-400 to-red-600'
+                                                    }`}></div>
                                                 <CardContent className="p-8">
                                                     <div className="flex items-start justify-between mb-6">
                                                         <div className="flex-1">
                                                             <div className="flex items-center gap-3 mb-3">
-                                                                <div className={`p-3 rounded-lg ${
-                                                                    content.type === 'quiz' 
-                                                                        ? 'bg-blue-100 dark:bg-blue-900/30' 
+                                                                <div className={`p-3 rounded-lg ${content.type === 'quiz'
+                                                                        ? 'bg-blue-100 dark:bg-blue-900/30'
                                                                         : 'bg-green-100 dark:bg-green-900/30'
-                                                                }`}>
+                                                                    }`}>
                                                                     {content.type === 'quiz' ? (
                                                                         <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                                                                     ) : (

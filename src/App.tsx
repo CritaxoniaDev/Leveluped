@@ -1,11 +1,17 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
+import { StripeProvider } from "@/providers/StripeProvider"
 import MainPage from "@/pages/MainPage"
 import Login from "@/auth/Login"
 import Signup from "@/auth/Signup"
 import InputOTP from "@/auth/InputOTP"
 import VerifyUser from "@/pages/verify/VerifyUser"
+import PrivacyPolicy from "@/pages/PrivacyPolicy"
+import { ReactLenis } from 'lenis/react'
+import TermsOfService from "@/pages/TermsOfService"
+import CourseOverview from "@/pages/CourseOverview"
+import About from "@/pages/About"
 import { LayoutDashboard } from "@/pages/dashboard/layout/LayoutDashboard"
 import LearnerDashboard from "@/pages/dashboard/learner/Dashboard"
 import MyCourses from "@/pages/dashboard/learner/MyCourses"
@@ -17,6 +23,7 @@ import LearnerViewElearningContent from "@/pages/dashboard/learner/ViewElearning
 import Leaderboard from "@/pages/dashboard/learner/Leaderboard"
 import LearnerSettings from "@/pages/dashboard/learner/Settings"
 import LearnerMessage from "@/pages/dashboard/learner/Message"
+import FeedbackPage from "@/pages/dashboard/learner/FeedbackPage"
 import InstructorDashboard from "@/pages/dashboard/instructor/Dashboard"
 import Courses from "@/pages/dashboard/instructor/Courses"
 import ViewCourse from "@/pages/dashboard/instructor/ViewCourse"
@@ -27,12 +34,22 @@ import Students from "@/pages/dashboard/instructor/Students"
 import InstructorProfile from "@/pages/dashboard/instructor/Profile"
 import InstructorSettings from "@/pages/dashboard/instructor/Settings"
 import InstructorMessage from "@/pages/dashboard/instructor/Message"
+import ViewFeedback from "@/pages/dashboard/instructor/ViewFeedback"
 import AdminDashboard from "@/pages/dashboard/admin/Dashboard"
 import Users from "@/pages/dashboard/admin/Users"
 import CourseMap from "@/pages/dashboard/admin/CourseMap"
 import AdminProfile from "@/pages/dashboard/admin/Profile"
 import { Toaster } from "@/components/ui/sonner"
 import { toast } from "sonner"
+
+// UUID generation function
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
 
 function AppContent() {
   const navigate = useNavigate()
@@ -66,7 +83,9 @@ function AppContent() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={
-          <MainPage onSignIn={() => navigate("/login")} />
+          <ReactLenis root>
+            <MainPage onSignIn={() => navigate("/login")} />
+          </ReactLenis>
         } />
 
         <Route path="/signup" element={
@@ -93,6 +112,12 @@ function AppContent() {
           </div>
         } />
 
+        {/* Legal Pages */}
+        <Route path="/privacy-policy" element={<ReactLenis root><PrivacyPolicy /></ReactLenis>} />
+        <Route path="/terms-of-service" element={<ReactLenis root><TermsOfService /></ReactLenis>} />
+        <Route path="/course/:id" element={<ReactLenis root><CourseOverview /></ReactLenis>} />
+        <Route path="/about" element={<ReactLenis root><About /></ReactLenis>} />
+
         {/* Protected Routes with Layout */}
         <Route path="/dashboard/learner" element={
           <LayoutDashboard allowedRoles={["learner"]}>
@@ -118,9 +143,16 @@ function AppContent() {
           </LayoutDashboard>
         } />
 
+        {/* Course Route */}
         <Route path="/dashboard/learner/course/:id" element={
           <LayoutDashboard allowedRoles={["learner"]}>
             <Course />
+          </LayoutDashboard>
+        } />
+
+        <Route path="/dashboard/learner/course/:courseId/feedback" element={
+          <LayoutDashboard allowedRoles={["learner"]}>
+            <FeedbackPage />
           </LayoutDashboard>
         } />
 
@@ -214,6 +246,12 @@ function AppContent() {
           </LayoutDashboard>
         } />
 
+        <Route path="/dashboard/instructor/courses/:courseId/feedback" element={
+          <LayoutDashboard allowedRoles={["instructor"]}>
+            <ViewFeedback />
+          </LayoutDashboard>
+        } />
+
         <Route path="/dashboard/admin" element={
           <LayoutDashboard allowedRoles={["admin"]}>
             <AdminDashboard />
@@ -240,8 +278,17 @@ function AppContent() {
 
         {/* 404 Route */}
         <Route path="*" element={
-          <div className="flex items-center justify-center min-h-screen">
-            <p className="text-white text-2xl">404 - Page Not Found</p>
+          <div className="flex items-center justify-center min-h-screen bg-white dark:bg-[#0a0a0a]">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">404</h1>
+              <p className="text-gray-600 dark:text-gray-400 mb-8">Page not found</p>
+              <button
+                onClick={() => navigate("/")}
+                className="px-6 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
+              >
+                Go Home
+              </button>
+            </div>
           </div>
         } />
       </Routes>
@@ -250,12 +297,16 @@ function AppContent() {
 }
 
 function App() {
+  const [versionId] = useState(() => generateUUID())
+
   return (
-    <Router>
-      <div className="tracking-tighter antialiased">
-        <AppContent />
-      </div>
-    </Router>
+    <StripeProvider>
+      <Router>
+        <div className="tracking-tighter antialiased" data-version-id={versionId}>
+          <AppContent />
+        </div>
+      </Router>
+    </StripeProvider>
   )
 }
 

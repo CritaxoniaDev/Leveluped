@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
 import { Header } from "@/components/header"
 import {
     SidebarProvider,
@@ -359,7 +359,9 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
     const isLearner = userProfile?.role === 'learner'
     const isLearnerDashboardPage = location.pathname === '/dashboard/learner'
     const isMessagesPage = location.pathname.includes('/messages')
+    const isFeedbackPage = location.pathname.includes('/feedback')
     const shouldUseFloatingHeader = isLearner && isLearnerDashboardPage
+    const shouldHideHeader = isFeedbackPage
 
     const learnerMenuItems = [
         { icon: LayoutDashboardIcon, label: "Dashboard", href: "/dashboard/learner" },
@@ -386,7 +388,7 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
                 </div>
             )}
 
-            {!shouldUseFloatingHeader && (
+            {!shouldUseFloatingHeader && !shouldHideHeader && (
                 <Header
                     userName={userProfile?.name || userProfile?.username}
                     userRole={userProfile?.role}

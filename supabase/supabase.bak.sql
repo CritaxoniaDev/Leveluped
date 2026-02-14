@@ -873,3 +873,126 @@ SELECT
     m.created_at as message_created_at
 FROM conversations c
 LEFT JOIN messages m ON c.last_message_id = m.id;
+
+CREATE TABLE public.course_feedback (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  course_id uuid NOT NULL,
+  enrollment_id uuid NOT NULL,
+  course_quality integer CHECK (course_quality >= 1 AND course_quality <= 5),
+  instructor_quality integer CHECK (instructor_quality >= 1 AND instructor_quality <= 5),
+  content_clarity integer CHECK (content_clarity >= 1 AND content_clarity <= 5),
+  course_difficulty integer CHECK (course_difficulty >= 1 AND course_difficulty <= 5),
+  would_recommend boolean,
+  comments text,
+  submitted_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT course_feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT course_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT course_feedback_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id) ON DELETE CASCADE,
+  CONSTRAINT course_feedback_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollments(id) ON DELETE CASCADE,
+  CONSTRAINT course_feedback_unique UNIQUE(user_id, course_id)
+);
+
+-- Create index for faster queries
+CREATE INDEX idx_course_feedback_course_id ON course_feedback(course_id);
+CREATE INDEX idx_course_feedback_user_id ON course_feedback(user_id);
+
+-- Enable RLS
+ALTER TABLE course_feedback ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+CREATE POLICY "Users can view their own feedback" ON course_feedback
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own feedback" ON course_feedback
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own feedback" ON course_feedback
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Instructors can view feedback for their courses" ON course_feedback
+  FOR SELECT USING (
+    course_id IN (
+      SELECT id FROM courses WHERE instructor_id = auth.uid()
+    )
+  );
+
+----------------------------------------------------------------
+
+-- Stripe Products Table
+CREATE TABLE public.stripe_products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  amount integer NOT NULL,
+  currency text DEFAULT 'usd'::text,
+  coins integer NOT NULL,
+  stripe_product_id text UNIQUE NOT NULL,
+  stripe_price_id text UNIQUE NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT stripe_products_pkey PRIMARY KEY (id)
+);
+
+-- User Wallets Table
+CREATE TABLE public.user_wallets (
+  user_id uuid NOT NULL UNIQUE,
+  total_coins integer DEFAULT 0,
+  spent_coins integer DEFAULT 0,
+  available_coins integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_wallets_pkey PRIMARY KEY (user_id),
+  CONSTRAINT user_wallets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+-- Coin Transactions Table
+CREATE TABLE public.coin_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  amount integer NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['purchase'::text, 'spend'::text, 'refund'::text, 'bonus'::text])),
+  description text NOT NULL,
+  reference_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT coin_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT coin_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+-- Stripe Payments Table
+CREATE TABLE public.stripe_payments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  stripe_session_id text UNIQUE NOT NULL,
+  stripe_payment_intent_id text UNIQUE,
+  product_id uuid NOT NULL,
+  amount integer NOT NULL,
+  currency text DEFAULT 'usd'::text,
+  coins integer NOT NULL,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text, 'refunded'::text])),
+  payment_method text,
+  created_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  CONSTRAINT stripe_payments_pkey PRIMARY KEY (id),
+  CONSTRAINT stripe_payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT stripe_payments_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.stripe_products(id)
+);
+
+-- Update courses table to support premium
+ALTER TABLE public.courses ADD COLUMN premium_price integer DEFAULT 0;
+ALTER TABLE public.courses ADD COLUMN premium_coin_cost integer DEFAULT 0;
+
+-- Update enrollments to track premium access
+ALTER TABLE public.enrollments ADD COLUMN premium_access boolean DEFAULT false;
+ALTER TABLE public.enrollments ADD COLUMN premium_access_until timestamp with time zone;
+
+-- Create indexes for better query performance
+CREATE INDEX idx_user_wallets_user_id ON public.user_wallets(user_id);
+CREATE INDEX idx_coin_transactions_user_id ON public.coin_transactions(user_id);
+CREATE INDEX idx_coin_transactions_created_at ON public.coin_transactions(created_at);
+CREATE INDEX idx_stripe_payments_user_id ON public.stripe_payments(user_id);
+CREATE INDEX idx_stripe_payments_status ON public.stripe_payments(status);
+CREATE INDEX idx_stripe_products_active ON public.stripe_products(is_active);

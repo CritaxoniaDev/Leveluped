@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -75,11 +75,11 @@ interface CourseProgress {
 
 const AVATAR_BORDERS = [
     { id: 'none', name: 'None', image: null },
-    { id: 'Border 1', name: 'Border 1', image: '/images/avatar-border/avatar-4.png' },
-    { id: 'Border 2', name: 'Border 2', image: '/images/avatar-border/avatar-1.png' },
-    { id: 'Border 3', name: 'Border 3', image: '/images/avatar-border/avatar-5.png' },
-    { id: 'Border 4', name: 'Border 4', image: '/images/avatar-border/avatar-6.png' },
-    { id: 'Border 5', name: 'Border 5', image: '/images/avatar-border/avatar-8.png' },
+    { id: 'Border 1', name: 'Border Design 1', image: '/images/avatar-border/avatar-4.png' },
+    { id: 'Border 2', name: 'Border Design 2', image: '/images/avatar-border/avatar-1.png' },
+    { id: 'Border 3', name: 'Border Design 3', image: '/images/avatar-border/avatar-5.png' },
+    { id: 'Border 4', name: 'Border Design 4', image: '/images/avatar-border/avatar-6.png' },
+    { id: 'Border 5', name: 'Border Design 5', image: '/images/avatar-border/avatar-8.png' },
 ]
 
 export default function LearnerProfile() {

@@ -45,10 +45,17 @@
       <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" rel="stylesheet">
       <!-- Theme Color -->
       <meta name="theme-color" content="#4f46e5" />
+      <!-- App Server Config - JWT Token -->
+      <script>
+            window.__APP_CONFIG__ = {
+                  jwtToken: window.__JWT_TOKEN__ || ''
+            };
+      </script>
 </head>
 
 <body id="_leveluped-app-body">
-      <noscript><strong>LevelUpED requires JavaScript to function properly. Please enable JavaScript in your browser.</strong></noscript>
+      <noscript><strong>LevelUpED requires JavaScript to function properly. Please enable JavaScript in your
+                  browser.</strong></noscript>
       <div id="root"></div>
       <!-- Main App Script -->
       <script type="module" src="/src/main.tsx"></script>

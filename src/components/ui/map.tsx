@@ -189,16 +189,24 @@ const LeafletMarkerClusterGroup = createLazyComponent(async () =>
 function Map({
     zoom = 15,
     maxZoom = 18,
+    minZoom = 3,
     className,
     ...props
 }: Omit<MapContainerProps, "zoomControl"> & {
     center: LatLngExpression
     ref?: Ref<LeafletMap>
 }) {
+    const maxBounds = [
+        [-85.05, -180],
+        [85.05, 180],
+    ] as L.LatLngBoundsExpression
+
     return (
         <LeafletMapContainer
             zoom={zoom}
             maxZoom={maxZoom}
+            minZoom={minZoom}
+            maxBounds={maxBounds}
             attributionControl={false}
             zoomControl={false}
             className={cn(

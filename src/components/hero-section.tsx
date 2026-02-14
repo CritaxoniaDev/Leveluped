@@ -58,13 +58,13 @@ export default function HeroSection({ onSignIn }: HeroSectionProps) {
                     <a href="#features" className="hover:text-indigo-600 transition">
                         Features
                     </a>
-                    <a href="#courses" className="hover:text-indigo-600 transition">
+                    <a href="/courses" className="hover:text-indigo-600 transition">
                         Courses
                     </a>
-                    <a href="#pricing" className="hover:text-indigo-600 transition">
+                    <a href="#testimonials" className="hover:text-indigo-600 transition">
                         Testimonials
                     </a>
-                    <a href="#about" className="hover:text-indigo-600 transition">
+                    <a href="/about" className="hover:text-indigo-600 transition">
                         About
                     </a>
                 </div>

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/packages/supabase/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -186,7 +186,7 @@ export default function Signup() {
                                         </p>
                                     ) : (
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            We'll send you a 6-digit verification code to sign in securely
+                                            We'll send you a 8-digit verification code to sign in securely
                                         </p>
                                     )}
                                 </div>
@@ -212,12 +212,20 @@ export default function Signup() {
                             {/* Footer Links */}
                             <div className="space-y-4">
                                 <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-                                    By signing in, you agree to our{" "}
-                                    <a href="#" className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                    By signing up, you agree to our{" "}
+                                    <a 
+                                        href="/terms-of-service" 
+                                        rel="noopener noreferrer"
+                                        className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    >
                                         Terms of Service
                                     </a>
                                     {" "}and{" "}
-                                    <a href="#" className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                    <a 
+                                        href="/privacy-policy" 
+                                        rel="noopener noreferrer"
+                                        className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    >
                                         Privacy Policy
                                     </a>
                                 </div>
