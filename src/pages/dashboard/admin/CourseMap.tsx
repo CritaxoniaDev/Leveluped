@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, createContext, useContext } from "react"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Input } from "@/packages/shadcn/ui/input"
 import {
     Dialog,
     DialogContent,
@@ -11,14 +11,14 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/packages/shadcn/ui/dialog"
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
+} from "@/packages/shadcn/ui/select"
 import {
     Table,
     TableBody,
@@ -26,7 +26,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table"
+} from "@/packages/shadcn/ui/table"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -36,8 +36,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
+} from "@/packages/shadcn/ui/alert-dialog"
+import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Globe } from "lucide-react"
 import {
@@ -45,7 +45,7 @@ import {
     MapTileLayer,
     MapZoomControl,
     MapLocateControl,
-} from "@/components/ui/map"
+} from "@/packages/shadcn/ui/map"
 import { Polygon } from 'react-leaflet'
 import { Popup, useMap } from 'react-leaflet'
 import countries from 'world-countries'

@@ -8,11 +8,11 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/packages/shadcn/ui/table"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Input } from "@/packages/shadcn/ui/input"
+import { Textarea } from "@/packages/shadcn/ui/textarea"
 import {
     Dialog,
     DialogContent,
@@ -21,20 +21,20 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/packages/shadcn/ui/dialog"
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
+} from "@/packages/shadcn/ui/select"
 import {
     Map,
     MapTileLayer,
     MapZoomControl,
     MapLocateControl,
-} from "@/components/ui/map"
+} from "@/packages/shadcn/ui/map"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -44,9 +44,9 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
+} from "@/packages/shadcn/ui/alert-dialog"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Checkbox } from "@/packages/shadcn/ui/checkbox"
 import { toast } from "sonner"
 import { Plus, BookOpen, Calendar, Edit, Trash2, Trophy, Target, Award, Eye, Globe } from "lucide-react"
 import { Polygon, useMap } from 'react-leaflet'

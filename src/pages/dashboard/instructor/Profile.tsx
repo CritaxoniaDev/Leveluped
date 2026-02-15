@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/packages/shadcn/ui/avatar"
 import { toast } from "sonner"
 import {
     BookOpen,

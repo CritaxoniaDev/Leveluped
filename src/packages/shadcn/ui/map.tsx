@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
+import { Button } from "@/packages/shadcn/ui/button"
+import { ButtonGroup } from "@/packages/shadcn/ui/button-group"
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -10,11 +10,11 @@ import {
     DropdownMenuRadioItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/packages/shadcn/ui/dropdown-menu"
 import {
     PlaceAutocomplete,
     type PlaceAutocompleteProps,
-} from "@/components/ui/place-autocomplete"
+} from "@/packages/shadcn/ui/place-autocomplete"
 import type { CheckboxItem } from "@radix-ui/react-dropdown-menu"
 import type {
     Circle,

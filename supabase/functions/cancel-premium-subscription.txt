@@ -1,0 +1,88 @@
+import Stripe from 'https://esm.sh/stripe@13.10.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+    apiVersion: '2023-10-16',
+})
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+interface CancelPremiumSubscriptionRequest {
+    userId: string
+}
+
+Deno.serve(async (req: Request) => {
+    try {
+        // Handle CORS
+        if (req.method === 'OPTIONS') {
+            return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } })
+        }
+
+        const { userId } = await req.json() as CancelPremiumSubscriptionRequest
+
+        if (!userId) {
+            return new Response(
+                JSON.stringify({ success: false, error: 'Missing user ID' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        console.log('Canceling premium subscription for user:', userId)
+
+        // Get active subscription
+        const { data: subscription, error: fetchError } = await supabase
+            .from('user_premium_subscriptions')
+            .select('stripe_subscription_id')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .maybeSingle()
+
+        if (fetchError) throw fetchError
+
+        if (!subscription) {
+            return new Response(
+                JSON.stringify({ success: false, error: 'No active subscription found' }),
+                { status: 404, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        // Cancel on Stripe
+        await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+            cancel_at_period_end: true,
+        })
+
+        // Update in database
+        const { error: updateError } = await supabase
+            .from('user_premium_subscriptions')
+            .update({ 
+                status: 'canceled',
+                canceled_at: new Date().toISOString() 
+            })
+            .eq('user_id', userId)
+            .eq('status', 'active')
+
+        if (updateError) throw updateError
+
+        console.log('Premium subscription canceled successfully')
+
+        return new Response(
+            JSON.stringify({
+                success: true,
+                message: 'Premium subscription will be canceled at the end of the billing period',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    } catch (error: any) {
+        console.error('Error canceling premium subscription:', error)
+
+        return new Response(
+            JSON.stringify({
+                success: false,
+                error: error.message || 'Failed to cancel premium subscription',
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
+})

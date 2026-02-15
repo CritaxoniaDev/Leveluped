@@ -1,0 +1,135 @@
+import Stripe from 'https://esm.sh/stripe@13.10.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+    apiVersion: '2023-10-16',
+})
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+interface CompletePremiumSubscriptionRequest {
+    userId: string
+    sessionId: string
+}
+
+interface UserPremiumSubscription {
+    id: string
+    user_id: string
+    premium_plan_id: string
+    stripe_subscription_id: string
+    status: 'active' | 'canceled' | 'past_due' | 'expired'
+    current_period_start: string
+    current_period_end: string
+    canceled_at: string | null
+    created_at: string
+}
+
+Deno.serve(async (req: Request) => {
+    try {
+        // Handle CORS
+        if (req.method === 'OPTIONS') {
+            return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } })
+        }
+
+        const { userId, sessionId } = await req.json() as CompletePremiumSubscriptionRequest
+
+        if (!userId || !sessionId) {
+            return new Response(
+                JSON.stringify({ success: false, error: 'Missing required fields' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        console.log('Completing premium subscription for user:', userId, 'Session:', sessionId)
+
+        // Retrieve the session from Stripe
+        const session = await stripe.checkout.sessions.retrieve(sessionId)
+
+        if (!session.subscription) {
+            throw new Error('No subscription found in session')
+        }
+
+        // Get subscription details from Stripe
+        const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+
+        if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+            throw new Error('Subscription is not active')
+        }
+
+        const planId = session.metadata?.planId
+
+        if (!planId) {
+            throw new Error('Plan ID not found in session metadata')
+        }
+
+        // Store subscription in database
+        const { data: existingSubscription, error: checkError } = await supabase
+            .from('user_premium_subscriptions')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .maybeSingle()
+
+        if (checkError && checkError.code !== 'PGRST116') {
+            throw checkError
+        }
+
+        // Cancel previous active subscription if exists
+        if (existingSubscription) {
+            const { error: cancelError } = await supabase
+                .from('user_premium_subscriptions')
+                .update({ status: 'canceled', canceled_at: new Date().toISOString() })
+                .eq('id', existingSubscription.id)
+
+            if (cancelError) throw cancelError
+        }
+
+        // Insert new subscription
+        const { data: newSubscription, error: insertError } = await supabase
+            .from('user_premium_subscriptions')
+            .insert({
+                user_id: userId,
+                premium_plan_id: planId,
+                stripe_subscription_id: subscription.id,
+                status: subscription.status === 'active' ? 'active' : 'trialing',
+                current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+                current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                created_at: new Date().toISOString(),
+            })
+            .select()
+            .single()
+
+        if (insertError) {
+            console.error('Error storing subscription:', insertError)
+            throw insertError
+        }
+
+        console.log('Premium subscription completed successfully:', newSubscription.id)
+
+        // Update session status
+        await supabase
+            .from('stripe_sessions')
+            .update({ status: 'completed' })
+            .eq('session_id', sessionId)
+
+        return new Response(
+            JSON.stringify({
+                success: true,
+                subscription: newSubscription as UserPremiumSubscription,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    } catch (error: any) {
+        console.error('Error completing premium subscription:', error)
+
+        return new Response(
+            JSON.stringify({
+                success: false,
+                error: error.message || 'Failed to complete premium subscription',
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
+})

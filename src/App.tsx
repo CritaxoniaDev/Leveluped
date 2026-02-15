@@ -24,6 +24,8 @@ import Leaderboard from "@/pages/dashboard/learner/Leaderboard"
 import LearnerSettings from "@/pages/dashboard/learner/Settings"
 import LearnerMessage from "@/pages/dashboard/learner/Message"
 import FeedbackPage from "@/pages/dashboard/learner/FeedbackPage"
+import CoinShop from "@/pages/dashboard/learner/CoinShop"
+import Premium from "@/pages/dashboard/learner/Premium"
 import InstructorDashboard from "@/pages/dashboard/instructor/Dashboard"
 import Courses from "@/pages/dashboard/instructor/Courses"
 import ViewCourse from "@/pages/dashboard/instructor/ViewCourse"
@@ -39,7 +41,8 @@ import AdminDashboard from "@/pages/dashboard/admin/Dashboard"
 import Users from "@/pages/dashboard/admin/Users"
 import CourseMap from "@/pages/dashboard/admin/CourseMap"
 import AdminProfile from "@/pages/dashboard/admin/Profile"
-import { Toaster } from "@/components/ui/sonner"
+import StripeProducts from "@/pages/dashboard/admin/StripeProducts"
+import { Toaster } from "@/packages/shadcn/ui/sonner"
 import { toast } from "sonner"
 
 // UUID generation function
@@ -82,36 +85,12 @@ function AppContent() {
       <Toaster position="top-right" style={{ fontFamily: "var(--font)" }} />
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={
-          <ReactLenis root>
-            <MainPage onSignIn={() => navigate("/login")} />
-          </ReactLenis>
-        } />
-
-        <Route path="/signup" element={
-          <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8">
-            <Signup />
-          </div>
-        } />
-
-        <Route path="/login" element={
-          <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8">
-            <Login />
-          </div>
-        } />
-
-        <Route path="/auth/input-otp" element={
-          <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8">
-            <InputOTP />
-          </div>
-        } />
-
-        <Route path="/verify/user" element={
-          <div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8">
-            <VerifyUser />
-          </div>
-        } />
-
+        <Route path="/" element={<ReactLenis root><MainPage onSignIn={() => navigate("/login")} /></ReactLenis>} />
+        <Route path="/signup" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><Signup /></div>} />
+        <Route path="/login" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><Login /></div>} />
+        <Route path="/auth/input-otp" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><InputOTP /></div>} />
+        <Route path="/verify/user" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><VerifyUser /></div>} />
+        
         {/* Legal Pages */}
         <Route path="/privacy-policy" element={<ReactLenis root><PrivacyPolicy /></ReactLenis>} />
         <Route path="/terms-of-service" element={<ReactLenis root><TermsOfService /></ReactLenis>} />
@@ -119,162 +98,37 @@ function AppContent() {
         <Route path="/about" element={<ReactLenis root><About /></ReactLenis>} />
 
         {/* Protected Routes with Layout */}
-        <Route path="/dashboard/learner" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <LearnerDashboard />
-          </LayoutDashboard>
-        } />
+        <Route path="/dashboard/learner" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerDashboard /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/my-courses" element={<LayoutDashboard allowedRoles={["learner"]}><MyCourses /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/messages" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerMessage /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/profile/:id" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerProfile /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/course/:id" element={<LayoutDashboard allowedRoles={["learner"]}><Course /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/course/:courseId/feedback" element={<LayoutDashboard allowedRoles={["learner"]}><FeedbackPage /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/course/:courseId/resource/:id" element={<LayoutDashboard allowedRoles={["learner"]}><TakeResourceContent /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/course/:courseId/elearning/:id" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerViewElearningContent /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/coin-shop" element={<LayoutDashboard allowedRoles={["learner"]}><CoinShop /></LayoutDashboard>} />  
+        <Route path="/dashboard/learner/achievements" element={<LayoutDashboard allowedRoles={["learner"]}><Achievements /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/leaderboard" element={<LayoutDashboard allowedRoles={["learner"]}><Leaderboard /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/premium" element={<LayoutDashboard allowedRoles={["learner"]}><Premium /></LayoutDashboard>} />
+        <Route path="/dashboard/learner/settings" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerSettings /></LayoutDashboard>} />
+        
+        <Route path="/dashboard/instructor" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorDashboard /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/profile/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorProfile /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/messages" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorMessage /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/settings" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorSettings /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/courses" element={<LayoutDashboard allowedRoles={["instructor"]}><Courses /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/courses/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><ViewCourse /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/courses/:courseId/resource-content/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><ViewResourceContent /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/students" element={<LayoutDashboard allowedRoles={["instructor"]}><Students /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/courses/:courseId/elearning" element={<LayoutDashboard allowedRoles={["instructor"]}><ElearningContent /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/courses/:courseId/elearning/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorViewElearningContent /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor/courses/:courseId/feedback" element={<LayoutDashboard allowedRoles={["instructor"]}><ViewFeedback /></LayoutDashboard>} />
 
-        <Route path="/dashboard/learner/my-courses" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <MyCourses />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/messages" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <LearnerMessage />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/profile/:id" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <LearnerProfile />
-          </LayoutDashboard>
-        } />
-
-        {/* Course Route */}
-        <Route path="/dashboard/learner/course/:id" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <Course />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/course/:courseId/feedback" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <FeedbackPage />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/course/:courseId/resource/:id" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <TakeResourceContent />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/course/:courseId/elearning/:id" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <LearnerViewElearningContent />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/achievements" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <Achievements />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/leaderboard" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <Leaderboard />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/learner/settings" element={
-          <LayoutDashboard allowedRoles={["learner"]}>
-            <LearnerSettings />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <InstructorDashboard />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/profile/:id" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <InstructorProfile />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/messages" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <InstructorMessage />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/settings" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <InstructorSettings />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/courses" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <Courses />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/courses/:id" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <ViewCourse />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/courses/:courseId/resource-content/:id" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <ViewResourceContent />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/students" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <Students />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/courses/:courseId/elearning" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <ElearningContent />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/courses/:courseId/elearning/:id" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <InstructorViewElearningContent />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/instructor/courses/:courseId/feedback" element={
-          <LayoutDashboard allowedRoles={["instructor"]}>
-            <ViewFeedback />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/admin" element={
-          <LayoutDashboard allowedRoles={["admin"]}>
-            <AdminDashboard />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/admin/profile/:id" element={
-          <LayoutDashboard allowedRoles={["admin"]}>
-            <AdminProfile />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/admin/users" element={
-          <LayoutDashboard allowedRoles={["admin"]}>
-            <Users />
-          </LayoutDashboard>
-        } />
-
-        <Route path="/dashboard/admin/courses" element={
-          <LayoutDashboard allowedRoles={["admin"]}>
-            <CourseMap />
-          </LayoutDashboard>
-        } />
+        <Route path="/dashboard/admin" element={<LayoutDashboard allowedRoles={["admin"]}><AdminDashboard /></LayoutDashboard>} />
+        <Route path="/dashboard/admin/profile/:id" element={<LayoutDashboard allowedRoles={["admin"]}><AdminProfile /></LayoutDashboard>} />
+        <Route path="/dashboard/admin/users" element={<LayoutDashboard allowedRoles={["admin"]}><Users /></LayoutDashboard>} />
+        <Route path="/dashboard/admin/courses" element={<LayoutDashboard allowedRoles={["admin"]}><CourseMap /></LayoutDashboard>} />
+        <Route path="/dashboard/admin/stripe-products" element={<LayoutDashboard allowedRoles={["admin"]}><StripeProducts /></LayoutDashboard>} />
 
         {/* 404 Route */}
         <Route path="*" element={

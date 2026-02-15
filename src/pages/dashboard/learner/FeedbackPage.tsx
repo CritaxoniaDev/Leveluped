@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { RadioGroup, RadioGroupItem } from "@/packages/shadcn/ui/radio-group"
+import { Label } from "@/packages/shadcn/ui/label"
+import { Textarea } from "@/packages/shadcn/ui/textarea"
 import { toast } from "sonner"
 import { MessageCircle, Send, ArrowLeft } from "lucide-react"
-import { Separator } from "@/components/ui/separator"
+import { Separator } from "@/packages/shadcn/ui/separator"
 
 interface FeedbackData {
     courseQuality: string

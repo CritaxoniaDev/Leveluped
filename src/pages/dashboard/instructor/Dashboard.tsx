@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
 import { Users, BookOpen, Star, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 

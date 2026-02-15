@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
 import { Award, Star } from "lucide-react"
 

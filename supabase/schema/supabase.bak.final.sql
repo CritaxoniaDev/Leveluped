@@ -1,3 +1,4 @@
+-- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
 CREATE TABLE public.badges (
@@ -12,6 +13,17 @@ CREATE TABLE public.badges (
   level_required integer DEFAULT 0,
   CONSTRAINT badges_pkey PRIMARY KEY (id),
   CONSTRAINT badges_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.coin_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  amount integer NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['purchase'::text, 'spend'::text, 'refund'::text, 'bonus'::text])),
+  description text NOT NULL,
+  reference_id uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT coin_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT coin_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.conversations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -37,6 +49,25 @@ CREATE TABLE public.countries_levels (
   base_country text,
   CONSTRAINT countries_levels_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.course_feedback (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  course_id uuid NOT NULL,
+  enrollment_id uuid NOT NULL,
+  course_quality integer CHECK (course_quality >= 1 AND course_quality <= 5),
+  instructor_quality integer CHECK (instructor_quality >= 1 AND instructor_quality <= 5),
+  content_clarity integer CHECK (content_clarity >= 1 AND content_clarity <= 5),
+  course_difficulty integer CHECK (course_difficulty >= 1 AND course_difficulty <= 5),
+  would_recommend boolean,
+  comments text,
+  submitted_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT course_feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT course_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT course_feedback_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id),
+  CONSTRAINT course_feedback_enrollment_id_fkey FOREIGN KEY (enrollment_id) REFERENCES public.enrollments(id)
+);
 CREATE TABLE public.courses (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -57,6 +88,8 @@ CREATE TABLE public.courses (
   longitude double precision,
   country_id uuid,
   city_name text,
+  premium_price integer DEFAULT 0,
+  premium_coin_cost integer DEFAULT 0,
   CONSTRAINT courses_pkey PRIMARY KEY (id),
   CONSTRAINT courses_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.users(id),
   CONSTRAINT courses_country_id_fkey FOREIGN KEY (country_id) REFERENCES public.countries_levels(id)
@@ -92,6 +125,8 @@ CREATE TABLE public.enrollments (
   enrolled_at timestamp with time zone DEFAULT now(),
   progress_percentage integer DEFAULT 0,
   completed_at timestamp with time zone,
+  premium_access boolean DEFAULT false,
+  premium_access_until timestamp with time zone,
   CONSTRAINT enrollments_pkey PRIMARY KEY (id),
   CONSTRAINT enrollments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
   CONSTRAINT enrollments_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.courses(id)
@@ -118,6 +153,21 @@ CREATE TABLE public.messages (
   CONSTRAINT messages_pkey PRIMARY KEY (id),
   CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id),
   CONSTRAINT messages_recipient_id_fkey FOREIGN KEY (recipient_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.premium_plans (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  price integer NOT NULL,
+  currency text DEFAULT 'usd'::text,
+  billing_period text NOT NULL CHECK (billing_period = ANY (ARRAY['monthly'::text, 'yearly'::text])),
+  stripe_price_id text NOT NULL UNIQUE,
+  stripe_product_id text NOT NULL UNIQUE,
+  features jsonb NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT premium_plans_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.resource_attempts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -175,6 +225,48 @@ CREATE TABLE public.star_currency (
   CONSTRAINT star_currency_pkey PRIMARY KEY (id),
   CONSTRAINT star_currency_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.stripe_customers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  stripe_customer_id text NOT NULL UNIQUE,
+  email text NOT NULL,
+  name text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT stripe_customers_pkey PRIMARY KEY (id),
+  CONSTRAINT stripe_customers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.stripe_payments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  stripe_session_id text NOT NULL UNIQUE,
+  stripe_payment_intent_id text UNIQUE,
+  product_id uuid NOT NULL,
+  amount integer NOT NULL,
+  currency text DEFAULT 'usd'::text,
+  coins integer NOT NULL,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text, 'refunded'::text])),
+  payment_method text,
+  created_at timestamp with time zone DEFAULT now(),
+  completed_at timestamp with time zone,
+  CONSTRAINT stripe_payments_pkey PRIMARY KEY (id),
+  CONSTRAINT stripe_payments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT stripe_payments_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.stripe_products(id)
+);
+CREATE TABLE public.stripe_products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  amount integer NOT NULL,
+  currency text DEFAULT 'usd'::text,
+  coins integer NOT NULL,
+  stripe_product_id text NOT NULL UNIQUE,
+  stripe_price_id text NOT NULL UNIQUE,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT stripe_products_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.user_badges (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
@@ -183,6 +275,22 @@ CREATE TABLE public.user_badges (
   CONSTRAINT user_badges_pkey PRIMARY KEY (id),
   CONSTRAINT user_badges_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
   CONSTRAINT user_badges_badge_id_fkey FOREIGN KEY (badge_id) REFERENCES public.badges(id)
+);
+CREATE TABLE public.user_premium_subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  premium_plan_id uuid NOT NULL,
+  stripe_subscription_id text NOT NULL UNIQUE,
+  stripe_customer_id text NOT NULL,
+  status text NOT NULL CHECK (status = ANY (ARRAY['active'::text, 'canceled'::text, 'past_due'::text, 'expired'::text])),
+  current_period_start timestamp with time zone NOT NULL,
+  current_period_end timestamp with time zone NOT NULL,
+  canceled_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_premium_subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT user_premium_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT user_premium_subscriptions_premium_plan_id_fkey FOREIGN KEY (premium_plan_id) REFERENCES public.premium_plans(id)
 );
 CREATE TABLE public.user_sessions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -204,6 +312,16 @@ CREATE TABLE public.user_stats (
   CONSTRAINT user_stats_pkey PRIMARY KEY (user_id),
   CONSTRAINT user_stats_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.user_wallets (
+  user_id uuid NOT NULL,
+  total_coins integer DEFAULT 0,
+  spent_coins integer DEFAULT 0,
+  available_coins integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_wallets_pkey PRIMARY KEY (user_id),
+  CONSTRAINT user_wallets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.users (
   id uuid NOT NULL,
   email character varying NOT NULL UNIQUE,
@@ -219,4 +337,15 @@ CREATE TABLE public.users (
   full_name character varying,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.stripe_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  session_id text NOT NULL UNIQUE,
+  user_id uuid NOT NULL,
+  plan_id uuid NOT NULL,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT stripe_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT stripe_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT stripe_sessions_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.premium_plans(id)
 );

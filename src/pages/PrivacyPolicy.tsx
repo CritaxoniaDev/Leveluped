@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/packages/shadcn/ui/button"
 import { ArrowLeft } from "lucide-react"
 
 export default function PrivacyPolicy() {

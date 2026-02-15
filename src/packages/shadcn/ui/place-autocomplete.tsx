@@ -7,13 +7,13 @@ import {
     CommandGroup,
     CommandItem,
     CommandList,
-} from "@/components/ui/command"
+} from "@/packages/shadcn/ui/command"
 import {
     InputGroup,
     InputGroupAddon,
     InputGroupInput,
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/packages/shadcn/ui/input-group"
+import { Spinner } from "@/packages/shadcn/ui/spinner"
 import type { BBox, Feature, FeatureCollection, Point } from "geojson"
 import { MapPinIcon, SearchIcon } from "lucide-react"
 import * as React from "react"

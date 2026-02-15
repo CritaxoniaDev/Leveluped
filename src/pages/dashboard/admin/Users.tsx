@@ -7,17 +7,17 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+} from "@/packages/shadcn/ui/table"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Input } from "@/packages/shadcn/ui/input"
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
+} from "@/packages/shadcn/ui/select"
 import { toast } from "sonner"
 import { Search, Users as UsersIcon, Mail, User, Shield } from "lucide-react"
 

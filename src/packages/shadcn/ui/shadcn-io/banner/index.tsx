@@ -9,7 +9,7 @@ import {
   type MouseEventHandler,
   useContext,
 } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/packages/shadcn/ui/button';
 import { cn } from '@/lib/utils';
 
 type BannerContextProps = {

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/packages/shadcn/ui/avatar"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -10,18 +10,19 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+} from "@/packages/shadcn/ui/dropdown-menu"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Progress } from "@/packages/shadcn/ui/progress"
 import { toast } from "sonner"
-import { LogOut, User, Crown, Zap, Star } from "lucide-react"
+import { LogOut, User, Crown, Zap, Star, Plus, Coins as CoinsIcon } from "lucide-react"
 import {
     NavigationMenu,
     NavigationMenuList,
     NavigationMenuItem,
     NavigationMenuLink,
-} from "@/components/ui/navigation-menu"
+} from "@/packages/shadcn/ui/navigation-menu"
 import { LoginStreakDialog } from "@/components/login-streak-dialog"
+import { checkUserPremium } from "@/services/StripeService"
 
 interface HeaderProps {
     userName: string
@@ -58,6 +59,8 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
     const [showLoginStreakDialog, setShowLoginStreakDialog] = useState(false)
     const [loginStreakInfo, setLoginStreakInfo] = useState<any>(null)
     const [previousLevel, setPreviousLevel] = useState(userLevel || 1)
+    const [userCoins, setUserCoins] = useState(0)
+    const [isPremium, setIsPremium] = useState(false)
 
     const getUserId = async () => {
         const { data: { session } } = await supabase.auth.getSession()
@@ -90,9 +93,8 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         const percentage = (currentLevelXP / xpRequiredForNextLevel) * 100
         setProgressPercentage(Math.min(Math.max(0, percentage), 100))
 
-        // Check for level up
         if (level > previousLevel && previousLevel > 0) {
-            toast.success("Level Up! 🎉", {
+            toast.success("Level Up!", {
                 description: `Congratulations! You've reached Level ${level}!`
             })
             setPreviousLevel(level)
@@ -198,6 +200,42 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         }
     }
 
+    const fetchUserCoins = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return
+
+            const { data: wallet, error } = await supabase
+                .from("user_wallets")
+                .select("available_coins")
+                .eq("user_id", session.user.id)
+                .maybeSingle()
+
+            if (error) {
+                console.error("Error fetching coins:", error)
+                return
+            }
+
+            if (wallet) {
+                setUserCoins(wallet.available_coins || 0)
+            }
+        } catch (error) {
+            console.error("Error fetching coins:", error)
+        }
+    }
+
+    const fetchPremiumStatus = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return
+
+            const hasPremium = await checkUserPremium(session.user.id)
+            setIsPremium(hasPremium)
+        } catch (error) {
+            console.error("Error fetching premium status:", error)
+        }
+    }
+
     const handleDailyLogin = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession()
@@ -242,6 +280,8 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         fetchLearnerXP()
         fetchUserAvatar()
         fetchStarData()
+        fetchUserCoins()
+        fetchPremiumStatus()
         handleDailyLogin()
 
         let channel: any = null
@@ -263,9 +303,8 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                         const newLevel = newStats.current_level
                         const newXP = newStats.total_xp
 
-                        // Check for level up before updating state
                         if (newLevel > currentLevel) {
-                            toast.success("Level Up! 🎉", {
+                            toast.success("Level Up!", {
                                 description: `Congratulations! You've reached Level ${newLevel}!`
                             })
                         }
@@ -275,34 +314,53 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                         updateXPDisplay(newXP, newLevel)
                     }
                 })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'user_wallets',
+                    filter: `user_id=eq.${session.user.id}`
+                }, (payload) => {
+                    const newWallet = payload.new as any
+                    if (newWallet) {
+                        setUserCoins(newWallet.available_coins || 0)
+                    }
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'user_premium_subscriptions',
+                    filter: `user_id=eq.${session.user.id}`
+                }, (payload) => {
+                    const newSubscription = payload.new as any
+                    if (newSubscription) {
+                        setIsPremium(newSubscription.status === 'active')
+                    }
+                })
 
         }
 
         setupSubscription()
 
-        // Poll more frequently for updates
         const pollInterval = setInterval(() => {
             fetchLearnerXP()
             fetchStarData()
-        }, 5000) // Changed from 10s to 5s
+            fetchUserCoins()
+            fetchPremiumStatus()
+        }, 5000)
 
         return () => {
             isSubscribed = false
             clearInterval(pollInterval)
             if (channel) {
-
                 supabase.removeChannel(channel)
             }
         }
     }, [userRole, fetchLearnerXP, updateXPDisplay, currentLevel])
 
-    // Sync with prop changes
     useEffect(() => {
         if (userLevel && userLevel !== currentLevel) {
-
-            // Check for level up
             if (userLevel > currentLevel) {
-                toast.success("Level Up! 🎉", {
+                toast.success("Level Up!", {
                     description: `Congratulations! You've reached Level ${userLevel}!`
                 })
             }
@@ -318,6 +376,14 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         if (userId) {
             navigate(`/dashboard/${userRole}/profile/${userId}`)
         }
+    }
+
+    const handleCoinsClick = () => {
+        navigate('/dashboard/learner/coin-shop')
+    }
+
+    const handlePremiumClick = () => {
+        navigate('/dashboard/learner/premium')
     }
 
     const getSelectedBorderImage = () => {
@@ -393,12 +459,36 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                     </div>
 
                     <div className="flex items-center gap-3 flex-shrink-0">
-                        {userRole === 'learner' && starData.total_stars > 0 && (
-                            <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
-                                <Star className="w-3 h-3 fill-yellow-400" />
-                                <span className="font-semibold">{starData.total_stars}</span>
-                            </Badge>
+                        {userRole === 'learner' && !isPremium && (
+                            <Button
+                                onClick={handlePremiumClick}
+                                className="flex items-center gap-1.5 text-xs px-3 py-1 h-auto font-semibold bg-transparent border-2 border-purple-500 text-purple-600 dark:text-purple-400 dark:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200"
+                            >
+                                <Crown className="w-3.5 h-3.5" />
+                                <span>Get Premium</span>
+                            </Button>
                         )}
+
+                        {userRole === 'learner' && isPremium && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md shadow-md border-0">
+                                <Crown className="w-3.5 h-3.5 animate-pulse" />
+                                <span>Premium</span>
+                            </div>
+                        )}
+
+                        <Button
+                            onClick={handleCoinsClick}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 h-auto font-semibold bg-transparent border-2 border-amber-500 text-amber-600 dark:text-amber-400 dark:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all duration-200"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <CoinsIcon className="w-3.5 h-3.5" />
+                            <span>{userCoins}</span>
+                        </Button>
+
+                        <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
+                            <Star className="w-3 h-3 fill-yellow-400" />
+                            <span className="font-semibold">{starData.total_stars}</span>
+                        </Badge>
 
                         {userRole === 'learner' && currentLevel && (
                             <div className="hidden sm:flex items-center gap-2 min-w-[180px]">
@@ -454,6 +544,14 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                                         <p className="text-xs leading-none text-muted-foreground capitalize">
                                             {userRole}
                                         </p>
+                                        {isPremium && (
+                                            <div className="mt-1 flex items-center gap-1">
+                                                <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                                                <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                                                    Premium Member
+                                                </span>
+                                            </div>
+                                        )}
                                         {userRole === 'learner' && (
                                             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2">
                                                 <div>
@@ -473,9 +571,15 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <span className="text-[10px] text-gray-500 dark:text-gray-400">Streak:</span>
-                                                        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">{starData.login_streak} 🔥</span>
+                                                        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">{starData.login_streak}</span>
                                                     </div>
                                                 </div>
+                                                {userCoins > 0 && (
+                                                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center gap-1">
+                                                        <CoinsIcon className="w-3.5 h-3.5 fill-amber-600 dark:fill-amber-400 text-amber-600 dark:text-amber-400" />
+                                                        <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">{userCoins} Coins</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -485,6 +589,18 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                                     <User className="mr-2 h-3.5 w-3.5" />
                                     <span>Profile</span>
                                 </DropdownMenuItem>
+                                {userRole === 'learner' && (
+                                    <>
+                                        <DropdownMenuItem onClick={handleCoinsClick} className="text-xs sm:text-sm">
+                                            <CoinsIcon className="mr-2 h-3.5 w-3.5" />
+                                            <span>Coin Shop</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={handlePremiumClick} className="text-xs sm:text-sm">
+                                            <Crown className="mr-2 h-3.5 w-3.5" />
+                                            <span>{isPremium ? 'Manage Premium' : 'Get Premium'}</span>
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="text-xs sm:text-sm">
                                     <LogOut className="mr-2 h-3.5 w-3.5" />

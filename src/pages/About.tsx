@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
 import { ArrowLeft, Zap, Users, Target, Award, TrendingUp, Globe, Heart, Lightbulb, Shield } from "lucide-react"
 
 export default function About() {

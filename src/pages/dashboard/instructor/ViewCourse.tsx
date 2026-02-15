@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Input } from "@/packages/shadcn/ui/input"
+import { Textarea } from "@/packages/shadcn/ui/textarea"
 import {
     Dialog,
     DialogContent,
@@ -13,15 +13,15 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/packages/shadcn/ui/dialog"
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
+} from "@/packages/shadcn/ui/select"
+import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
 import { ArrowLeft, Trophy, Target, Award, Eye, Users, Star, Plus, Brain, FileQuestion, BookOpen, MessageSquare } from "lucide-react"
 

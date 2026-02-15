@@ -1,0 +1,96 @@
+import Stripe from 'https://esm.sh/stripe@13.10.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+    apiVersion: '2023-10-16',
+})
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+interface CreatePremiumSubscriptionRequest {
+    userId: string
+    customerId: string
+    priceId: string
+    planId: string
+    successUrl: string
+    cancelUrl: string
+}
+
+Deno.serve(async (req: Request) => {
+    try {
+        // Handle CORS
+        if (req.method === 'OPTIONS') {
+            return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } })
+        }
+
+        const { userId, customerId, priceId, planId, successUrl, cancelUrl } = await req.json() as CreatePremiumSubscriptionRequest
+
+        // Validate inputs
+        if (!userId || !customerId || !priceId || !planId || !successUrl || !cancelUrl) {
+            return new Response(
+                JSON.stringify({ success: false, error: 'Missing required fields' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        console.log('Creating premium subscription for user:', userId)
+
+        // Create checkout session for subscription
+        const session = await stripe.checkout.sessions.create({
+            customer: customerId,
+            mode: 'subscription',
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            success_url: `${successUrl}&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: cancelUrl,
+            metadata: {
+                userId,
+                planId,
+            },
+        })
+
+        console.log('Checkout session created:', session.id)
+
+        // Store session info for verification
+        const { error: storeError } = await supabase
+            .from('stripe_sessions')
+            .insert({
+                session_id: session.id,
+                user_id: userId,
+                plan_id: planId,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+            })
+
+        if (storeError) {
+            console.error('Error storing session:', storeError)
+            throw storeError
+        }
+
+        return new Response(
+            JSON.stringify({
+                success: true,
+                sessionId: session.id,
+                checkoutUrl: session.url,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    } catch (error: any) {
+        console.error('Error creating premium subscription:', error)
+
+        return new Response(
+            JSON.stringify({
+                success: false,
+                error: error.message || 'Failed to create premium subscription',
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
+})

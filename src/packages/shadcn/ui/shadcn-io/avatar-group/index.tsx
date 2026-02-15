@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@/packages/shadcn/ui/tooltip';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 // Define types based on components

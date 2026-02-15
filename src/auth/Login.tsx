@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { supabase } from "@/packages/supabase/supabase"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Input } from "@/packages/shadcn/ui/input"
+import { Separator } from "@/packages/shadcn/ui/separator"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 

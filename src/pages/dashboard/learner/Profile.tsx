@@ -1,28 +1,28 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/packages/shadcn/ui/avatar"
+import { Progress } from "@/packages/shadcn/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/packages/shadcn/ui/tabs"
+import { Input } from "@/packages/shadcn/ui/input"
+import { Textarea } from "@/packages/shadcn/ui/textarea"
+import { Label } from "@/packages/shadcn/ui/label"
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/packages/shadcn/ui/dialog"
 import { toast } from "sonner"
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/packages/shadcn/ui/tooltip"
 import {
     Award,
     BookOpen,
@@ -32,7 +32,10 @@ import {
     Camera,
     MessageCircle,
     Heart,
+    Lock,
+    Crown,
 } from "lucide-react"
+import { checkUserPremium } from "@/services/StripeService"
 
 interface UserProfile {
     id: string
@@ -75,11 +78,11 @@ interface CourseProgress {
 
 const AVATAR_BORDERS = [
     { id: 'none', name: 'None', image: null },
-    { id: 'Border 1', name: 'Border Design 1', image: '/images/avatar-border/avatar-4.png' },
-    { id: 'Border 2', name: 'Border Design 2', image: '/images/avatar-border/avatar-1.png' },
-    { id: 'Border 3', name: 'Border Design 3', image: '/images/avatar-border/avatar-5.png' },
-    { id: 'Border 4', name: 'Border Design 4', image: '/images/avatar-border/avatar-6.png' },
-    { id: 'Border 5', name: 'Border Design 5', image: '/images/avatar-border/avatar-8.png' },
+    { id: 'Border 1', name: 'Neon Splash Ring', image: '/images/avatar-border/avatar-4.png' },
+    { id: 'Border 2', name: 'Candy Pop Celebration', image: '/images/avatar-border/avatar-1.png' },
+    { id: 'Border 3', name: 'Dreamy Cloud Garden', image: '/images/avatar-border/avatar-5.png' },
+    { id: 'Border 4', name: 'Royal Victory Crest', image: '/images/avatar-border/avatar-6.png' },
+    { id: 'Border 5', name: 'Bunny Meadow Frame', image: '/images/avatar-border/avatar-8.png' },
 ]
 
 export default function LearnerProfile() {
@@ -99,6 +102,7 @@ export default function LearnerProfile() {
     const [editingName, setEditingName] = useState("")
     const [editingBio, setEditingBio] = useState("")
     const [savingProfile, setSavingProfile] = useState(false)
+    const [isPremium, setIsPremium] = useState(false)
 
     const getXPForLevel = (level: number) => {
         if (level <= 1) return 0
@@ -122,6 +126,12 @@ export default function LearnerProfile() {
             }
 
             setIsOwnProfile(session.user.id === id)
+
+            // Check premium status if it's their own profile
+            if (session.user.id === id) {
+                const hasPremium = await checkUserPremium(session.user.id)
+                setIsPremium(hasPremium)
+            }
 
             // Fetch user profile
             const { data: profile, error: profileError } = await supabase
@@ -378,6 +388,28 @@ export default function LearnerProfile() {
         return border?.image || undefined
     }
 
+    const handleBorderClick = () => {
+        if (!isOwnProfile) {
+            toast.error("Not your profile", {
+                description: "You can only change your own avatar border"
+            })
+            return
+        }
+
+        setShowBorderSelector(true)
+    }
+
+    const handleBorderSelect = async (borderId: string) => {
+        if (!isPremium) {
+            toast.error("Premium required", {
+                description: "Upgrade to premium to unlock avatar borders"
+            })
+            return
+        }
+
+        await updateAvatarBorder(borderId)
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
@@ -464,9 +496,9 @@ export default function LearnerProfile() {
                                             <TooltipTrigger asChild>
                                                 <Button
                                                     size="sm"
-                                                    variant="secondary"
-                                                    onClick={() => setShowBorderSelector(true)}
-                                                    className="rounded-full shadow-lg"
+                                                    variant={isPremium ? "secondary" : "outline"}
+                                                    onClick={handleBorderClick}
+                                                    className={`rounded-full shadow-lg`}
                                                 >
                                                     <Upload className="w-3 h-3" />
                                                 </Button>
@@ -484,9 +516,17 @@ export default function LearnerProfile() {
                         <div className="flex-1 flex flex-col justify-end mt-14">
                             {/* Name and Username */}
                             <div className="space-y-2">
-                                <h1 className="text-3xl sm:text-5xl font-bold">
-                                    {userProfile?.name}
-                                </h1>
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-3xl sm:text-5xl font-bold">
+                                        {userProfile?.name}
+                                    </h1>
+                                    {isPremium && isOwnProfile && (
+                                        <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-700 flex items-center gap-1">
+                                            <Crown className="w-3 h-3" />
+                                            <span>Premium</span>
+                                        </Badge>
+                                    )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 font-medium">
                                         @{userProfile?.username}
@@ -755,7 +795,9 @@ export default function LearnerProfile() {
                     <DialogHeader>
                         <DialogTitle>Choose Avatar Border</DialogTitle>
                         <DialogDescription>
-                            Select a border style to customize your profile avatar
+                            {isPremium
+                                ? "Select a border style to customize your profile avatar"
+                                : "Avatar borders are a premium feature. Upgrade to unlock all avatar customization options"}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -763,13 +805,13 @@ export default function LearnerProfile() {
                         {AVATAR_BORDERS.map((border) => (
                             <button
                                 key={border.id}
-                                onClick={() => updateAvatarBorder(border.id)}
-                                disabled={updatingBorder}
-                                className={`p-4 rounded-lg border-2 transition-all ${userProfile?.avatar_border === border.id ||
-                                    (border.id === 'none' && !userProfile?.avatar_border)
-                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
-                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                    }`}
+                                onClick={() => handleBorderSelect(border.id)}
+                                disabled={updatingBorder || (!isPremium && border.id !== 'none')}
+                                className={`p-4 rounded-lg border-2 transition-all relative group ${userProfile?.avatar_border === border.id ||
+                                        (border.id === 'none' && !userProfile?.avatar_border)
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    } ${!isPremium && border.id !== 'none' ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
                                 {/* Avatar with actual profile image */}
                                 <div className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto">
@@ -791,6 +833,13 @@ export default function LearnerProfile() {
                                             className="absolute inset-0 w-full h-full pointer-events-none scale-150"
                                         />
                                     )}
+
+                                    {/* Premium Lock Overlay */}
+                                    {!isPremium && border.id !== 'none' && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-full group-hover:bg-black/50 transition-colors">
+                                            <Lock className="w-6 h-6 text-white" />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Border Name */}
@@ -800,6 +849,30 @@ export default function LearnerProfile() {
                             </button>
                         ))}
                     </div>
+
+                    {!isPremium && (
+                        <div className="p-4 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg text-center space-y-3">
+                            <div className="flex items-center justify-center gap-2">
+                                <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                                <p className="text-sm font-semibold text-purple-700 dark:text-purple-400">
+                                    Unlock Avatar Borders
+                                </p>
+                            </div>
+                            <p className="text-xs text-purple-600 dark:text-purple-400">
+                                Upgrade to premium to customize your avatar with exclusive borders and frames
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    setShowBorderSelector(false)
+                                    navigate("/dashboard/learner/premium")
+                                }}
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                                <Crown className="w-4 h-4 mr-2" />
+                                Upgrade to Premium
+                            </Button>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
 
@@ -853,7 +926,7 @@ export default function LearnerProfile() {
                         {/* Info Text */}
                         <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
                             <p className="text-xs text-blue-700 dark:text-blue-400">
-                                💡 Keep your bio friendly and professional. Avoid sharing personal information like phone numbers or addresses.
+                                Keep your bio friendly and professional. Avoid sharing personal information like phone numbers or addresses.
                             </p>
                         </div>
 

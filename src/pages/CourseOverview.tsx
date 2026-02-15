@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
 import { ArrowLeft, BookOpen, Trophy, Users, Clock, Globe, Star, Award, Target } from "lucide-react"
 

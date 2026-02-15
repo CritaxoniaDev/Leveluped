@@ -1,0 +1,190 @@
+import Stripe from 'https://esm.sh/stripe@13.0.0'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info, apikey',
+}
+
+Deno.serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders })
+    }
+
+    if (req.method !== 'POST') {
+        return new Response(
+            JSON.stringify({ success: false, error: 'Method not allowed' }),
+            { status: 405, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        )
+    }
+
+    try {
+        const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+        if (!stripeKey || !supabaseUrl || !supabaseKey) {
+            throw new Error('Missing environment configuration')
+        }
+
+        const stripe = new Stripe(stripeKey)
+        const supabase = createClient(supabaseUrl, supabaseKey)
+
+        const { sessionId, userId } = await req.json()
+
+        if (!sessionId || !userId) {
+            throw new Error('Missing sessionId or userId')
+        }
+
+        console.log('Completing purchase for session:', sessionId)
+
+        // Retrieve the checkout session from Stripe
+        const session = await stripe.checkout.sessions.retrieve(sessionId)
+
+        console.log('Session payment status:', session.payment_status)
+        console.log('Session metadata:', session.metadata)
+
+        if (session.payment_status !== 'paid') {
+            throw new Error(`Payment not completed. Status: ${session.payment_status}`)
+        }
+
+        // Get productId from metadata
+        const productId = session.metadata?.productId
+
+        if (!productId) {
+            console.error('No productId in metadata:', session.metadata)
+            throw new Error('Product ID not found in session metadata')
+        }
+
+        console.log('Product ID from metadata:', productId)
+
+        // Fetch the product details
+        const { data: product, error: productError } = await supabase
+            .from('stripe_products')
+            .select('id, coins, amount, currency, name')
+            .eq('id', productId)
+            .single()
+
+        if (productError) {
+            console.error('Product fetch error:', productError)
+            throw new Error(`Product not found with ID: ${productId}`)
+        }
+
+        if (!product) {
+            throw new Error('Product data is empty')
+        }
+
+        console.log('Product found:', product)
+
+        // Create stripe payment record
+        const { data: paymentRecord, error: paymentError } = await supabase
+            .from('stripe_payments')
+            .insert({
+                user_id: userId,
+                stripe_session_id: sessionId,
+                stripe_payment_intent_id: session.payment_intent || null,
+                product_id: productId,
+                amount: product.amount,
+                currency: product.currency,
+                coins: product.coins,
+                status: 'completed',
+                completed_at: new Date().toISOString()
+            })
+            .select()
+            .single()
+
+        if (paymentError) {
+            console.error('Payment record error:', paymentError)
+            throw paymentError
+        }
+
+        console.log('Payment record created:', paymentRecord.id)
+
+        // Get or create user wallet
+        const { data: wallet } = await supabase
+            .from('user_wallets')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle()
+
+        let updatedWallet
+
+        if (wallet) {
+            const { data: updated, error: updateError } = await supabase
+                .from('user_wallets')
+                .update({
+                    total_coins: wallet.total_coins + product.coins,
+                    available_coins: wallet.available_coins + product.coins,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId)
+                .select()
+                .single()
+
+            if (updateError) throw updateError
+            updatedWallet = updated
+        } else {
+            const { data: newWallet, error: createError } = await supabase
+                .from('user_wallets')
+                .insert({
+                    user_id: userId,
+                    total_coins: product.coins,
+                    spent_coins: 0,
+                    available_coins: product.coins
+                })
+                .select()
+                .single()
+
+            if (createError) throw createError
+            updatedWallet = newWallet
+        }
+
+        console.log('Wallet updated:', updatedWallet)
+
+        // Create coin transaction
+        const { data: transaction, error: transactionError } = await supabase
+            .from('coin_transactions')
+            .insert({
+                user_id: userId,
+                amount: product.coins,
+                type: 'purchase',
+                description: `Purchased ${product.coins} coins - ${product.name}`,
+                reference_id: paymentRecord.id
+            })
+            .select()
+            .single()
+
+        if (transactionError) {
+            console.error('Transaction error:', transactionError)
+            throw transactionError
+        }
+
+        console.log('Transaction created:', transaction.id)
+        console.log('Purchase completed successfully')
+
+        return new Response(
+            JSON.stringify({ 
+                success: true,
+                message: 'Purchase completed',
+                coins: updatedWallet.total_coins
+            }),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            }
+        )
+    } catch (error: any) {
+
+        return new Response(
+            JSON.stringify({ 
+                success: false,
+                error: error.message
+            }),
+            {
+                status: 400,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            }
+        )
+    }
+})

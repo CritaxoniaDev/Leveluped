@@ -1,5 +1,5 @@
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
+import { Separator } from '@/packages/shadcn/ui/separator'
 
 export default function Footer() {
     return (

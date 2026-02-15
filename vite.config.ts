@@ -26,9 +26,9 @@ export default defineConfig({
           'supabase-vendor': ['@supabase/supabase-js'],
           'utils': ['sonner', 'clsx']
         },
-        chunkFileNames: `assets/[name]-v=levelupedv1_${buildId}-[hash].js`,
-        entryFileNames: `assets/[name]-v=levelupedv1_${buildId}-[hash].js`,
-        assetFileNames: `assets/[name]-v=levelupedv1_${buildId}-[hash].[ext]`
+        chunkFileNames: `_vite/_assets/_chunks/[name]-v=levelupedv1_${buildId}-[hash].js`,
+        entryFileNames: `_vite/_assets/_chunks/[name]-v=levelupedv1-${buildId}-[hash].js`,
+        assetFileNames: `_vite/_assets/_chunks/[name]-v=levelupedv1-${buildId}-[hash].[ext]`
       }
     }
   },

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Progress } from "@/packages/shadcn/ui/progress"
+import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
 import { ArrowLeft, BookOpen } from "lucide-react"
 

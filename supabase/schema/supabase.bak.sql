@@ -981,6 +981,22 @@ CREATE TABLE public.stripe_payments (
   CONSTRAINT stripe_payments_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.stripe_products(id)
 );
 
+-- Stripe Customers Table
+CREATE TABLE public.stripe_customers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  stripe_customer_id text UNIQUE NOT NULL,
+  email text NOT NULL,
+  name text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT stripe_customers_pkey PRIMARY KEY (id),
+  CONSTRAINT stripe_customers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_stripe_customers_user_id ON public.stripe_customers(user_id);
+CREATE INDEX idx_stripe_customers_stripe_customer_id ON public.stripe_customers(stripe_customer_id);
+
 -- Update courses table to support premium
 ALTER TABLE public.courses ADD COLUMN premium_price integer DEFAULT 0;
 ALTER TABLE public.courses ADD COLUMN premium_coin_cost integer DEFAULT 0;
@@ -996,3 +1012,114 @@ CREATE INDEX idx_coin_transactions_created_at ON public.coin_transactions(create
 CREATE INDEX idx_stripe_payments_user_id ON public.stripe_payments(user_id);
 CREATE INDEX idx_stripe_payments_status ON public.stripe_payments(status);
 CREATE INDEX idx_stripe_products_active ON public.stripe_products(is_active);
+
+-- Premium Subscription Plan
+CREATE TABLE public.premium_plans (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  price integer NOT NULL,
+  currency text DEFAULT 'usd'::text,
+  billing_period text NOT NULL CHECK (billing_period IN ('monthly', 'yearly')),
+  stripe_price_id text UNIQUE NOT NULL,
+  stripe_product_id text UNIQUE NOT NULL,
+  features jsonb NOT NULL, -- { avatar_borders: boolean, custom_themes: boolean, etc }
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT premium_plans_pkey PRIMARY KEY (id)
+);
+
+-- User Premium Subscriptions
+CREATE TABLE public.user_premium_subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  premium_plan_id uuid NOT NULL,
+  stripe_subscription_id text UNIQUE NOT NULL,
+  stripe_customer_id text NOT NULL,
+  status text NOT NULL CHECK (status IN ('active', 'canceled', 'past_due', 'expired')),
+  current_period_start timestamp with time zone NOT NULL,
+  current_period_end timestamp with time zone NOT NULL,
+  canceled_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_premium_subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT user_premium_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT user_premium_subscriptions_premium_plan_id_fkey FOREIGN KEY (premium_plan_id) REFERENCES public.premium_plans(id) ON DELETE RESTRICT
+);
+
+-- Create indexes
+CREATE INDEX idx_premium_plans_active ON public.premium_plans(is_active);
+CREATE INDEX idx_user_premium_subscriptions_user_id ON public.user_premium_subscriptions(user_id);
+CREATE INDEX idx_user_premium_subscriptions_status ON public.user_premium_subscriptions(status);
+CREATE INDEX idx_user_premium_subscriptions_current_period_end ON public.user_premium_subscriptions(current_period_end);
+
+-- Enable RLS
+ALTER TABLE public.premium_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_premium_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Policies for premium_plans (public read)
+CREATE POLICY "Anyone can view active premium plans" ON public.premium_plans
+    FOR SELECT USING (is_active = true);
+
+CREATE POLICY "Admins can manage premium plans" ON public.premium_plans
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.users 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- Policies for user_premium_subscriptions
+CREATE POLICY "Users can view their own premium subscription" ON public.user_premium_subscriptions
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own premium subscription" ON public.user_premium_subscriptions
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Function to check if user has premium
+CREATE OR REPLACE FUNCTION user_has_premium(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.user_premium_subscriptions
+        WHERE user_id = p_user_id 
+        AND status = 'active'
+        AND current_period_end > NOW()
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get user premium features
+CREATE OR REPLACE FUNCTION get_user_premium_features(p_user_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+    v_features JSONB;
+BEGIN
+    SELECT pp.features INTO v_features
+    FROM public.user_premium_subscriptions ups
+    JOIN public.premium_plans pp ON ups.premium_plan_id = pp.id
+    WHERE ups.user_id = p_user_id 
+    AND ups.status = 'active'
+    AND ups.current_period_end > NOW()
+    LIMIT 1;
+    
+    RETURN COALESCE(v_features, '{}'::jsonb);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION user_has_premium(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_premium_features(UUID) TO authenticated;
+
+CREATE TABLE public.stripe_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  session_id text NOT NULL UNIQUE,
+  user_id uuid NOT NULL,
+  plan_id uuid NOT NULL,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT stripe_sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT stripe_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT stripe_sessions_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.premium_plans(id)
+);

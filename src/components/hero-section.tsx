@@ -1,17 +1,17 @@
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/packages/shadcn/ui/button"
 import { Menu, X, Sparkles } from "lucide-react"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { AvatarGroup } from "@/components/ui/shadcn-io/avatar-group"
+import { Avatar, AvatarImage, AvatarFallback } from "@/packages/shadcn/ui/avatar"
+import { AvatarGroup } from "@/packages/shadcn/ui/shadcn-io/avatar-group"
 import {
     Banner,
     BannerIcon,
     BannerTitle,
     BannerClose,
-} from "@/components/ui/shadcn-io/banner"
-import { Map, MapTileLayer, MapMarker, MapPopup, MapTooltip, MapLayers, MapZoomControl, MapLayersControl } from "@/components/ui/map"
+} from "@/packages/shadcn/ui/shadcn-io/banner"
+import { Map, MapTileLayer, MapMarker, MapPopup, MapTooltip, MapLayers, MapZoomControl, MapLayersControl } from "@/packages/shadcn/ui/map"
 import { MapPinIcon } from "lucide-react"
-import { AuroraText } from "./ui/aurora-text"
+import { AuroraText } from "@/packages/shadcn/ui/aurora-text"
 import { useNavigate } from "react-router-dom"
 
 interface HeroSectionProps {

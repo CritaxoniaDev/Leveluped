@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/packages/shadcn/ui/tabs"
+import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
 import {
     ArrowLeft,
@@ -15,7 +15,7 @@ import {
     Calendar,
     User
 } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
+import { Progress } from "@/packages/shadcn/ui/progress"
 
 interface StudentFeedback {
     id: string

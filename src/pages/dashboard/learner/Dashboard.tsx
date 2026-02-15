@@ -2,9 +2,9 @@ import { useEffect, useState, useRef, createContext, useContext } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Progress } from "@/packages/shadcn/ui/progress"
 import {
   Map,
   MapTileLayer,
@@ -15,15 +15,15 @@ import {
   MapLayersControl,
   MapFullscreenControl,
   MapLayers,
-} from "@/components/ui/map"
+} from "@/packages/shadcn/ui/map"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Card, CardContent } from "@/components/ui/card"
+} from "@/packages/shadcn/ui/dialog"
+import { Card, CardContent } from "@/packages/shadcn/ui/card"
 import { Trophy, Eye, MapPin, BookCopy, Lightbulb, Award, Zap } from "lucide-react"
 import { Polygon, useMap } from 'react-leaflet'
 import { checkAndAwardCourseEnrollmentMilestones, awardBadge } from "@/helpers/achievementHelper"

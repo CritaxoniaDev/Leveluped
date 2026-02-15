@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/packages/supabase/supabase"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/packages/shadcn/ui/avatar"
 import { toast } from "sonner"
 import { Crown, Zap } from "lucide-react"
 

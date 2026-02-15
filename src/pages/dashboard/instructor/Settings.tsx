@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/packages/shadcn/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +10,7 @@ import {
   AlertDialogDescription,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/packages/shadcn/ui/alert-dialog"
 import { toast } from "sonner"
 
 interface UserProfile {

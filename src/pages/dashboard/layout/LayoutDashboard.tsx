@@ -13,8 +13,8 @@ import {
     SidebarFooter,
     SidebarSeparator,
     useSidebar,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
+} from "@/packages/shadcn/ui/sidebar"
+import { Button } from "@/packages/shadcn/ui/button"
 import { toast } from "sonner"
 import {
     LayoutDashboard as LayoutDashboardIcon,
@@ -26,6 +26,8 @@ import {
     ChevronLeft,
     ChevronRight,
     CircleStar,
+    Coins,
+    BanknoteArrowDown,
 } from "lucide-react"
 import {
     checkAllAchievements
@@ -70,6 +72,8 @@ function SidebarContent() {
         { icon: BookOpen, label: "Course Map", href: "/dashboard/admin/courses" },
         { icon: Users, label: "Users", href: "/dashboard/admin/users" },
         { icon: MessageSquare, label: "Support", href: "/dashboard/admin/support" },
+        { icon: BanknoteArrowDown, label: "Transactions", href: "/dashboard/admin/transactions" },
+        { icon: Coins, label: "Stripe Products", href: "/dashboard/admin/stripe-products" },
         { icon: Settings, label: "Settings", href: "/dashboard/admin/settings" },
     ]
 

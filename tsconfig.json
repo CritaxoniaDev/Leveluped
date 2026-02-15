@@ -43,6 +43,9 @@
       ],
       "@/packages/*": [
         "./src/packages/*"
+      ],
+      "@/services/*": [
+        "./src/services/*"
       ]
     }
   }

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/packages/supabase/supabase"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/packages/shadcn/ui/card"
+import { Badge } from "@/packages/shadcn/ui/badge"
+import { Progress } from "@/packages/shadcn/ui/progress"
+import { Button } from "@/packages/shadcn/ui/button"
 import { Trophy, Star, Award, Target, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import {

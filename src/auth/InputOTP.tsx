@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { supabase } from "@/packages/supabase/supabase"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/packages/shadcn/ui/button"
+import { Input } from "@/packages/shadcn/ui/input"
 import { toast } from "sonner"
 
 export default function InputOTP() {
