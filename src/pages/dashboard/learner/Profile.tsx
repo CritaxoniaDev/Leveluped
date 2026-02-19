@@ -36,6 +36,8 @@ import {
     Crown,
 } from "lucide-react"
 import { checkUserPremium } from "@/services/StripeService"
+import { AVATAR_BORDERS } from '@/constants/avatar';
+import { decryptPath } from '@/utils/encryption';
 
 interface UserProfile {
     id: string
@@ -75,15 +77,6 @@ interface CourseProgress {
     lessons_completed: number
     total_lessons: number
 }
-
-const AVATAR_BORDERS = [
-    { id: 'none', name: 'None', image: null },
-    { id: 'Border 1', name: 'Neon Splash Ring', image: '/images/avatar-border/avatar-4.png' },
-    { id: 'Border 2', name: 'Candy Pop Celebration', image: '/images/avatar-border/avatar-1.png' },
-    { id: 'Border 3', name: 'Dreamy Cloud Garden', image: '/images/avatar-border/avatar-5.png' },
-    { id: 'Border 4', name: 'Royal Victory Crest', image: '/images/avatar-border/avatar-6.png' },
-    { id: 'Border 5', name: 'Bunny Meadow Frame', image: '/images/avatar-border/avatar-8.png' },
-]
 
 export default function LearnerProfile() {
     const { id } = useParams()
@@ -385,7 +378,7 @@ export default function LearnerProfile() {
 
     const getSelectedBorderImage = () => {
         const border = AVATAR_BORDERS.find(b => b.id === userProfile?.avatar_border)
-        return border?.image || undefined
+        return border || undefined
     }
 
     const handleBorderClick = () => {
@@ -462,9 +455,10 @@ export default function LearnerProfile() {
                                 {/* Avatar Border Overlay */}
                                 {getSelectedBorderImage() && (
                                     <img
-                                        src={getSelectedBorderImage() as string}
+                                        src={decryptPath(getSelectedBorderImage()?.image as string)}
                                         alt="Avatar Border"
-                                        className="absolute inset-0 w-full h-full pointer-events-none scale-150"
+                                        className="absolute inset-0 w-full h-full pointer-events-none"
+                                        style={{ transform: `scale(${getSelectedBorderImage()?.scale || 1})` }}
                                     />
                                 )}
                                 {isOwnProfile && (
@@ -791,7 +785,7 @@ export default function LearnerProfile() {
 
             {/* Avatar Border Selector Dialog */}
             <Dialog open={showBorderSelector} onOpenChange={setShowBorderSelector}>
-                <DialogContent className="sm:max-w-xl">
+                <DialogContent className="sm:max-w-6xl">
                     <DialogHeader>
                         <DialogTitle>Choose Avatar Border</DialogTitle>
                         <DialogDescription>
@@ -801,16 +795,16 @@ export default function LearnerProfile() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 my-6">
+                    <div className="grid grid-cols-5 gap-4 my-6">
                         {AVATAR_BORDERS.map((border) => (
                             <button
                                 key={border.id}
                                 onClick={() => handleBorderSelect(border.id)}
                                 disabled={updatingBorder || (!isPremium && border.id !== 'none')}
                                 className={`p-4 rounded-lg border-2 transition-all relative group ${userProfile?.avatar_border === border.id ||
-                                        (border.id === 'none' && !userProfile?.avatar_border)
-                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
-                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    (border.id === 'none' && !userProfile?.avatar_border)
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+                                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                                     } ${!isPremium && border.id !== 'none' ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
                                 {/* Avatar with actual profile image */}
@@ -828,9 +822,10 @@ export default function LearnerProfile() {
                                     {/* Border Overlay Preview */}
                                     {border.image && (
                                         <img
-                                            src={border.image}
+                                            src={decryptPath(border.image)}
                                             alt={border.name}
-                                            className="absolute inset-0 w-full h-full pointer-events-none scale-150"
+                                            className="absolute inset-0 w-full h-full pointer-events-none"
+                                            style={{ transform: `scale(${border.scale})` }}
                                         />
                                     )}
 

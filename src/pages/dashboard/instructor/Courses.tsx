@@ -392,7 +392,7 @@ export default function Courses() {
                     description: formData.description,
                     category: formData.category,
                     image_url: imageUrl,
-                    levels: selectedCountryData.max_level,
+                    levels: formData.levels,
                     max_xp: formData.max_xp,
                     leaderboard_enabled: formData.leaderboard_enabled,
                     badges_enabled: formData.badges_enabled,
@@ -657,7 +657,7 @@ export default function Courses() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="h-96 w-full rounded-md overflow-hidden">
+                    <div className="h-120 w-full rounded-md overflow-hidden">
                         <HoverContext.Provider value={{ hoveredCountryId, setHoveredCountryId }}>
                             <Map center={[20, 0]} zoom={2} className="h-full w-full">
                                 <MapTileLayer />

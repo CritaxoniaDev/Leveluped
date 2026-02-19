@@ -10,8 +10,10 @@ import VerifyUser from "@/pages/verify/VerifyUser"
 import PrivacyPolicy from "@/pages/PrivacyPolicy"
 import { ReactLenis } from 'lenis/react'
 import TermsOfService from "@/pages/TermsOfService"
+import Pricing from "@/components/pricing"
 import CourseOverview from "@/pages/CourseOverview"
 import About from "@/pages/About"
+import CookiesPolicy from "@/pages/CookiesPolicy"
 import { LayoutDashboard } from "@/pages/dashboard/layout/LayoutDashboard"
 import LearnerDashboard from "@/pages/dashboard/learner/Dashboard"
 import MyCourses from "@/pages/dashboard/learner/MyCourses"
@@ -42,6 +44,7 @@ import Users from "@/pages/dashboard/admin/Users"
 import CourseMap from "@/pages/dashboard/admin/CourseMap"
 import AdminProfile from "@/pages/dashboard/admin/Profile"
 import StripeProducts from "@/pages/dashboard/admin/StripeProducts"
+import Transactions from "@/pages/dashboard/admin/Transactions"
 import { Toaster } from "@/packages/shadcn/ui/sonner"
 import { toast } from "sonner"
 
@@ -54,8 +57,13 @@ const generateUUID = (): string => {
   })
 }
 
+function VersionedDiv({ children, versionId }: { children: React.ReactNode, versionId: string }) {
+  return <div data-version-id={versionId}>{children}</div>
+}
+
 function AppContent() {
   const navigate = useNavigate()
+  const [versionId] = useState(() => generateUUID())
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -85,50 +93,53 @@ function AppContent() {
       <Toaster position="top-right" style={{ fontFamily: "var(--font)" }} />
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<ReactLenis root><MainPage onSignIn={() => navigate("/login")} /></ReactLenis>} />
-        <Route path="/signup" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><Signup /></div>} />
-        <Route path="/login" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><Login /></div>} />
-        <Route path="/auth/input-otp" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><InputOTP /></div>} />
-        <Route path="/verify/user" element={<div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><VerifyUser /></div>} />
+        <Route path="/" element={<VersionedDiv versionId={versionId}><ReactLenis root><MainPage onSignIn={() => navigate("/login")} /></ReactLenis></VersionedDiv>} />
+        <Route path="/pricing" element={<VersionedDiv versionId={versionId}><ReactLenis root><Pricing /></ReactLenis></VersionedDiv>} />
+        <Route path="/signup" element={<VersionedDiv versionId={versionId}><div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><Signup /></div></VersionedDiv>} />
+        <Route path="/login" element={<VersionedDiv versionId={versionId}><div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><Login /></div></VersionedDiv>} />
+        <Route path="/auth/input-otp" element={<VersionedDiv versionId={versionId}><div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><InputOTP /></div></VersionedDiv>} />
+        <Route path="/verify/user" element={<VersionedDiv versionId={versionId}><div className="w-full min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#18181b] dark:to-[#27272a] py-12 px-4 sm:px-6 lg:px-8"><VerifyUser /></div></VersionedDiv>} />
         
         {/* Legal Pages */}
-        <Route path="/privacy-policy" element={<ReactLenis root><PrivacyPolicy /></ReactLenis>} />
-        <Route path="/terms-of-service" element={<ReactLenis root><TermsOfService /></ReactLenis>} />
-        <Route path="/course/:id" element={<ReactLenis root><CourseOverview /></ReactLenis>} />
-        <Route path="/about" element={<ReactLenis root><About /></ReactLenis>} />
+        <Route path="/privacy-policy" element={<VersionedDiv versionId={versionId}><ReactLenis root><PrivacyPolicy /></ReactLenis></VersionedDiv>} />
+        <Route path="/terms-of-service" element={<VersionedDiv versionId={versionId}><ReactLenis root><TermsOfService /></ReactLenis></VersionedDiv>} />
+        <Route path="/courses" element={<VersionedDiv versionId={versionId}><ReactLenis root><CourseOverview /></ReactLenis></VersionedDiv>} />
+        <Route path="/about" element={<VersionedDiv versionId={versionId}><ReactLenis root><About /></ReactLenis></VersionedDiv>} />
+        <Route path="/cookies-policy" element={<VersionedDiv versionId={versionId}><ReactLenis root><CookiesPolicy /></ReactLenis></VersionedDiv>} />
 
         {/* Protected Routes with Layout */}
-        <Route path="/dashboard/learner" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerDashboard /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/my-courses" element={<LayoutDashboard allowedRoles={["learner"]}><MyCourses /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/messages" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerMessage /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/profile/:id" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerProfile /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/course/:id" element={<LayoutDashboard allowedRoles={["learner"]}><Course /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/course/:courseId/feedback" element={<LayoutDashboard allowedRoles={["learner"]}><FeedbackPage /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/course/:courseId/resource/:id" element={<LayoutDashboard allowedRoles={["learner"]}><TakeResourceContent /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/course/:courseId/elearning/:id" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerViewElearningContent /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/coin-shop" element={<LayoutDashboard allowedRoles={["learner"]}><CoinShop /></LayoutDashboard>} />  
-        <Route path="/dashboard/learner/achievements" element={<LayoutDashboard allowedRoles={["learner"]}><Achievements /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/leaderboard" element={<LayoutDashboard allowedRoles={["learner"]}><Leaderboard /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/premium" element={<LayoutDashboard allowedRoles={["learner"]}><Premium /></LayoutDashboard>} />
-        <Route path="/dashboard/learner/settings" element={<LayoutDashboard allowedRoles={["learner"]}><LearnerSettings /></LayoutDashboard>} />
+        <Route path="/dashboard/learner" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerDashboard /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/my-courses" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><MyCourses /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/messages" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerMessage /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/profile/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerProfile /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/course/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Course /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/course/:courseId/feedback" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><FeedbackPage /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/course/:courseId/resource/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><TakeResourceContent /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/course/:courseId/elearning/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerViewElearningContent /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/coin-shop" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><CoinShop /></LayoutDashboard></VersionedDiv>} />  
+        <Route path="/dashboard/learner/achievements" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Achievements /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/leaderboard" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Leaderboard /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/premium" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Premium /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/settings" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerSettings /></LayoutDashboard></VersionedDiv>} />
         
-        <Route path="/dashboard/instructor" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorDashboard /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/profile/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorProfile /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/messages" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorMessage /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/settings" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorSettings /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/courses" element={<LayoutDashboard allowedRoles={["instructor"]}><Courses /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/courses/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><ViewCourse /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/courses/:courseId/resource-content/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><ViewResourceContent /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/students" element={<LayoutDashboard allowedRoles={["instructor"]}><Students /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/courses/:courseId/elearning" element={<LayoutDashboard allowedRoles={["instructor"]}><ElearningContent /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/courses/:courseId/elearning/:id" element={<LayoutDashboard allowedRoles={["instructor"]}><InstructorViewElearningContent /></LayoutDashboard>} />
-        <Route path="/dashboard/instructor/courses/:courseId/feedback" element={<LayoutDashboard allowedRoles={["instructor"]}><ViewFeedback /></LayoutDashboard>} />
+        <Route path="/dashboard/instructor" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorDashboard /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/profile/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorProfile /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/messages" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorMessage /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/settings" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorSettings /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/courses" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><Courses /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/courses/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><ViewCourse /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/courses/:courseId/resource-content/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><ViewResourceContent /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/students" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><Students /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/courses/:courseId/elearning" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><ElearningContent /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/courses/:courseId/elearning/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorViewElearningContent /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/instructor/courses/:courseId/feedback" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><ViewFeedback /></LayoutDashboard></VersionedDiv>} />
 
-        <Route path="/dashboard/admin" element={<LayoutDashboard allowedRoles={["admin"]}><AdminDashboard /></LayoutDashboard>} />
-        <Route path="/dashboard/admin/profile/:id" element={<LayoutDashboard allowedRoles={["admin"]}><AdminProfile /></LayoutDashboard>} />
-        <Route path="/dashboard/admin/users" element={<LayoutDashboard allowedRoles={["admin"]}><Users /></LayoutDashboard>} />
-        <Route path="/dashboard/admin/courses" element={<LayoutDashboard allowedRoles={["admin"]}><CourseMap /></LayoutDashboard>} />
-        <Route path="/dashboard/admin/stripe-products" element={<LayoutDashboard allowedRoles={["admin"]}><StripeProducts /></LayoutDashboard>} />
+        <Route path="/dashboard/admin" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["admin"]}><AdminDashboard /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/admin/profile/:id" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["admin"]}><AdminProfile /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/admin/users" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["admin"]}><Users /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/admin/courses" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["admin"]}><CourseMap /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/admin/transactions" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["admin"]}><Transactions /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/admin/stripe-products" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["admin"]}><StripeProducts /></LayoutDashboard></VersionedDiv>} />
 
         {/* 404 Route */}
         <Route path="*" element={
@@ -156,7 +167,7 @@ function App() {
   return (
     <StripeProvider>
       <Router>
-        <div className="tracking-tighter antialiased" data-version-id={versionId}>
+        <div className="tracking-tight antialiased" data-version-id={versionId}>
           <AppContent />
         </div>
       </Router>

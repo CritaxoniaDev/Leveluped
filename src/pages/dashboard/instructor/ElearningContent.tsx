@@ -146,36 +146,48 @@ export default function ElearningContent() {
 
   const generateContentWithAI = async (prompt: string) => {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_PUBLIC_GEMINI_API_KEY}`, {
-        method: 'POST',
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Authorization": `Bearer ${import.meta.env.VITE_PUBLIC_OPENROUTER_API_KEY}`,
+          "HTTP-Referer": window.location.origin, // Optional: your site URL
+          "X-Title": "LevelUpED", // Optional: your site name
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-          }
+          model: "google/gemma-3-12b-it:free",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: prompt
+                }
+                // You can add image content here if needed, e.g.:
+                // {
+                //   type: "image_url",
+                //   image_url: { url: "https://example.com/image.jpg" }
+                // }
+              ]
+            }
+          ]
         })
       })
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`)
+        const errorText = await response.text()
+        throw new Error(`API error: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        return data.candidates[0].content.parts[0].text
+      if (data.choices && data.choices[0]?.message?.content) {
+        return data.choices[0].message.content
       }
       return null
     } catch (error) {
       console.error("Error generating content with AI:", error)
-      return null
+      throw error
     }
   }
 

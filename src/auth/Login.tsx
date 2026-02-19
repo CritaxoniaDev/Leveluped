@@ -5,6 +5,7 @@ import { Input } from "@/packages/shadcn/ui/input"
 import { Separator } from "@/packages/shadcn/ui/separator"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { ArrowLeft } from "lucide-react"
 
 export default function Login() {
     const [email, setEmail] = useState("")
@@ -150,6 +151,15 @@ export default function Login() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                     {/* Left Side - Login Form */}
                     <div className="flex flex-col">
+                        {/* Back Arrow */}
+                        <Button
+                            variant="ghost"
+                            className="mb-4 w-fit text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => navigate("/")}
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            Back to Home
+                        </Button>
                         {/* Logo Section */}
                         <div className="mb-8">
                             <h1 className="text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
@@ -223,16 +233,16 @@ export default function Login() {
                             <div className="space-y-4">
                                 <div className="text-center text-xs text-gray-500 dark:text-gray-400">
                                     By signing in, you agree to our{" "}
-                                    <a 
-                                        href="/terms-of-service" 
+                                    <a
+                                        href="/terms-of-service"
                                         rel="noopener noreferrer"
                                         className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                     >
                                         Terms of Service
                                     </a>
                                     {" "}and{" "}
-                                    <a 
-                                        href="/privacy-policy" 
+                                    <a
+                                        href="/privacy-policy"
                                         rel="noopener noreferrer"
                                         className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                     >

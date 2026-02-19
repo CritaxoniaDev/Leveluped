@@ -15,6 +15,16 @@ import {
     DialogTrigger,
 } from "@/packages/shadcn/ui/dialog"
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/packages/shadcn/ui/alert-dialog"
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -23,7 +33,7 @@ import {
 } from "@/packages/shadcn/ui/select"
 import { Badge } from "@/packages/shadcn/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Trophy, Target, Award, Eye, Users, Star, Plus, Brain, FileQuestion, BookOpen, MessageSquare } from "lucide-react"
+import { ArrowLeft, Trophy, Target, Award, Eye, Users, Star, Plus, Brain, FileQuestion, BookOpen, MessageSquare, Trash2 } from "lucide-react"
 
 interface Course {
     id: string
@@ -75,6 +85,9 @@ export default function ViewCourse() {
     const [loading, setLoading] = useState(true)
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
     const [creating, setCreating] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [deleting, setDeleting] = useState(false)
     const [stats, setStats] = useState({
         totalStudents: 0,
         avgRating: 0,
@@ -222,35 +235,40 @@ export default function ViewCourse() {
 
     const generateContentWithAI = async (prompt: string) => {
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_PUBLIC_GEMINI_API_KEY}`, {
-                method: 'POST',
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Authorization": `Bearer ${import.meta.env.VITE_PUBLIC_OPENROUTER_API_KEY}`,
+                    "HTTP-Referer": window.location.origin, // Optional: your site URL
+                    "X-Title": "LevelUpED", // Optional: your site name
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: prompt
-                        }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 2048,
-                    }
+                    model: "mistralai/mistral-small-3.1-24b-instruct:free",
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                {
+                                    type: "text",
+                                    text: prompt
+                                }
+                            ]
+                        }
+                    ]
                 })
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                console.error('Gemini API error:', errorData)
-                throw new Error(`API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`)
+                const errorText = await response.text()
+                console.error('OpenRouter API error:', errorText)
+                throw new Error(`API error: ${response.status} - ${errorText}`)
             }
 
             const data = await response.json()
-            console.log('Gemini API response:', data) // For debugging
-
-            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-                return data.candidates[0].content.parts[0].text
+            // OpenRouter returns the result in choices[0].message.content
+            if (data.choices && data.choices[0]?.message?.content) {
+                return data.choices[0].message.content
             } else {
                 console.error('Unexpected API response structure:', data)
                 return null
@@ -326,8 +344,8 @@ export default function ViewCourse() {
 
             Each question should include:
             - A clear question
-            - Four options (A, B, C, D)
-            - The correct answer
+            - Four options as a plain array (e.g. ["London", "Berlin", "Paris", "Madrid"])
+            - The correct answer (must match one of the options exactly)
             - An explanation
 
             Return ONLY a valid JSON array with no additional text. Format:
@@ -467,6 +485,39 @@ export default function ViewCourse() {
         } finally {
             setCreating(false)
         }
+    }
+
+    const handleDeleteResourceContent = async (resourceId: string) => {
+        try {
+            setDeleting(true)
+            const { error } = await supabase
+                .from("resource_content")
+                .delete()
+                .eq("id", resourceId)
+
+            if (error) throw error
+
+            // Update local state
+            setResourceContents(resourceContents.filter(c => c.id !== resourceId))
+            setDeleteDialogOpen(false)
+            setDeletingId(null)
+
+            toast.success("Resource deleted", {
+                description: "Resource content has been deleted successfully"
+            })
+        } catch (error: any) {
+            console.error("Error deleting resource content:", error)
+            toast.error("Error", {
+                description: "Failed to delete resource content"
+            })
+        } finally {
+            setDeleting(false)
+        }
+    }
+
+    const openDeleteDialog = (resourceId: string) => {
+        setDeletingId(resourceId)
+        setDeleteDialogOpen(true)
     }
 
     const getStatusBadgeVariant = (status: string) => {
@@ -876,6 +927,14 @@ export default function ViewCourse() {
                                         <Button variant="ghost" size="sm">
                                             Edit
                                         </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => openDeleteDialog(content.id)}
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
                                     </div>
                                 </div>
                             ))}
@@ -883,6 +942,28 @@ export default function ViewCourse() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Resource Content</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this resource content? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => deletingId && handleDeleteResourceContent(deletingId)}
+                            disabled={deleting}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {deleting ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

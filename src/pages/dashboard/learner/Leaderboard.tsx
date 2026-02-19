@@ -3,6 +3,8 @@ import { supabase } from "@/packages/supabase/supabase"
 import { Avatar, AvatarFallback, AvatarImage } from "@/packages/shadcn/ui/avatar"
 import { toast } from "sonner"
 import { Crown, Zap } from "lucide-react"
+import { AVATAR_BORDERS } from '@/constants/avatar';
+import { decryptPath } from "@/utils/encryption"
 
 interface LeaderboardUser {
     id: string
@@ -13,15 +15,6 @@ interface LeaderboardUser {
     current_level: number
     leaderboard_rank: number | null
 }
-
-const AVATAR_BORDERS = [
-    { id: 'none', name: 'None', image: null },
-    { id: 'Border 1', name: 'Border 1', image: '/images/avatar-border/avatar-4.png' },
-    { id: 'Border 2', name: 'Border 2', image: '/images/avatar-border/avatar-1.png' },
-    { id: 'Border 3', name: 'Border 3', image: '/images/avatar-border/avatar-5.png' },
-    { id: 'Border 4', name: 'Border 4', image: '/images/avatar-border/avatar-6.png' },
-    { id: 'Border 5', name: 'Border 5', image: '/images/avatar-border/avatar-8.png' },
-]
 
 export default function Leaderboard() {
     const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([])
@@ -166,9 +159,9 @@ export default function Leaderboard() {
                                     </Avatar>
                                     {getSelectedBorderImage(topThree[1].avatar_border) && (
                                         <img
-                                            src={getSelectedBorderImage(topThree[1].avatar_border) as string}
+                                            src={decryptPath(getSelectedBorderImage(topThree[1].avatar_border) as string)}
                                             alt="Avatar Border"
-                                            className="absolute inset-0 w-full h-full pointer-events-none scale-150"
+                                            className="absolute inset-0 w-full h-full pointer-events-none scale-130"
                                         />
                                     )}
                                 </div>
@@ -209,9 +202,9 @@ export default function Leaderboard() {
                                     </Avatar>
                                     {getSelectedBorderImage(topThree[0].avatar_border) && (
                                         <img
-                                            src={getSelectedBorderImage(topThree[0].avatar_border) as string}
+                                            src={decryptPath(getSelectedBorderImage(topThree[0].avatar_border) as string)}
                                             alt="Avatar Border"
-                                            className="absolute inset-0 w-full h-full pointer-events-none scale-150"
+                                            className="absolute inset-0 w-full h-full pointer-events-none scale-130"
                                         />
                                     )}
                                 </div>
@@ -252,9 +245,9 @@ export default function Leaderboard() {
                                     </Avatar>
                                     {getSelectedBorderImage(topThree[2].avatar_border) && (
                                         <img
-                                            src={getSelectedBorderImage(topThree[2].avatar_border) as string}
+                                            src={decryptPath(getSelectedBorderImage(topThree[2].avatar_border) as string)}
                                             alt="Avatar Border"
-                                            className="absolute inset-0 w-full h-full pointer-events-none scale-150"
+                                            className="absolute inset-0 w-full h-full pointer-events-none scale-130"
                                         />
                                     )}
                                 </div>
@@ -310,9 +303,9 @@ export default function Leaderboard() {
                                         </Avatar>
                                         {getSelectedBorderImage(user.avatar_border) && (
                                             <img
-                                                src={getSelectedBorderImage(user.avatar_border) as string}
+                                                src={decryptPath(getSelectedBorderImage(user.avatar_border) as string)}
                                                 alt="Avatar Border"
-                                                className="absolute inset-0 w-full h-full pointer-events-none scale-150 rounded-full"
+                                                className="absolute inset-0 w-full h-full pointer-events-none scale-130 rounded-full"
                                             />
                                         )}
                                     </div>

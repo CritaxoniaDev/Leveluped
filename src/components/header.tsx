@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/packages/shadcn/ui/badge"
 import { Progress } from "@/packages/shadcn/ui/progress"
 import { toast } from "sonner"
-import { LogOut, User, Crown, Zap, Star, Plus, Coins as CoinsIcon } from "lucide-react"
+import { LogOut, User, Crown, Zap, Star, Plus, Menu, Coins as CoinsIcon } from "lucide-react"
 import {
     NavigationMenu,
     NavigationMenuList,
@@ -23,6 +23,8 @@ import {
 } from "@/packages/shadcn/ui/navigation-menu"
 import { LoginStreakDialog } from "@/components/login-streak-dialog"
 import { checkUserPremium } from "@/services/StripeService"
+import { AVATAR_BORDERS } from '@/constants/avatar';
+import { decryptPath } from "@/utils/encryption"
 
 interface HeaderProps {
     userName: string
@@ -31,15 +33,6 @@ interface HeaderProps {
     menuItems?: { icon: any, label: string, href: string }[]
     isFloating?: boolean
 }
-
-const AVATAR_BORDERS = [
-    { id: 'none', name: 'None', image: null },
-    { id: 'Border 1', name: 'Border 1', image: '/images/avatar-border/avatar-4.png' },
-    { id: 'Border 2', name: 'Border 2', image: '/images/avatar-border/avatar-1.png' },
-    { id: 'Border 3', name: 'Border 3', image: '/images/avatar-border/avatar-5.png' },
-    { id: 'Border 4', name: 'Border 4', image: '/images/avatar-border/avatar-6.png' },
-    { id: 'Border 5', name: 'Border 5', image: '/images/avatar-border/avatar-8.png' },
-]
 
 interface StarData {
     total_stars: number
@@ -60,6 +53,7 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
     const [loginStreakInfo, setLoginStreakInfo] = useState<any>(null)
     const [previousLevel, setPreviousLevel] = useState(userLevel || 1)
     const [userCoins, setUserCoins] = useState(0)
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [isPremium, setIsPremium] = useState(false)
 
     const getUserId = async () => {
@@ -424,18 +418,27 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         ? "fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-6xl rounded-xl shadow-lg backdrop-blur-md bg-white/85 dark:bg-gray-900/85 border border-gray-200/50 dark:border-gray-700/50"
         : "bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800"
 
-    const paddingClass = isFloating ? "px-5 py-2.5" : "px-6 py-4"
+    const paddingClass = isFloating ? "px-3 py-2.5 sm:px-5" : "px-3 py-3 sm:px-6 sm:py-4"
 
     return (
         <>
             <header className={`${headerClass} ${paddingClass}`}>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center justify-between gap-2 sm:gap-4 w-full">
+                    {/* Left: Logo */}
+                    <div className="flex items-center gap-2 min-w-0">
+                        <button
+                            className="md:hidden mr-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                            aria-label="Open menu"
+                        >
+                            <Menu className="w-6 h-6" />
+                        </button>
                         <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent head-font whitespace-nowrap">
                             LevelUpED
                         </h1>
+                        {/* Desktop Nav */}
                         {menuItems && menuItems.length > 0 && (
-                            <nav className="hidden md:flex">
+                            <nav className="hidden md:flex ml-4">
                                 <NavigationMenu>
                                     <NavigationMenuList>
                                         {menuItems.map((item, index) => {
@@ -458,11 +461,52 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                         )}
                     </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    {/* Center: Mobile Nav */}
+                    {mobileMenuOpen && (
+                        <div className="fixed inset-0 z-50 bg-black/40 flex md:hidden">
+                            {/* Animated slide-in menu */}
+                            <div
+                                className={`bg-white dark:bg-gray-900 w-64 h-full shadow-lg p-6 flex flex-col transform transition-transform duration-300 ease-in-out ${mobileMenuOpen ? "translate-x-0" : "-translate-x-64"
+                                    }`}
+                            >
+                                <button
+                                    className="self-end mb-4 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    aria-label="Close menu"
+                                >
+                                    <Menu className="w-6 h-6 rotate-90" />
+                                </button>
+                                {menuItems && menuItems.length > 0 && (
+                                    <nav className="flex flex-col gap-3">
+                                        {menuItems.map((item, index) => {
+                                            const Icon = item.icon
+                                            return (
+                                                <a
+                                                    key={item.href + index}
+                                                    href={item.href}
+                                                    className="flex items-center gap-2 px-2 py-2 rounded-md text-base hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                    onClick={() => setMobileMenuOpen(false)}
+                                                >
+                                                    <Icon className="w-4 h-4" />
+                                                    <span>{item.label}</span>
+                                                </a>
+                                            )
+                                        })}
+                                    </nav>
+                                )}
+                            </div>
+                            {/* Overlay click closes menu */}
+                            <div className="flex-1" onClick={() => setMobileMenuOpen(false)} />
+                        </div>
+                    )}
+
+                    {/* Right: User Actions */}
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        {/* Premium/Coins/Stars/Level - Hide some on mobile */}
                         {userRole === 'learner' && !isPremium && (
                             <Button
                                 onClick={handlePremiumClick}
-                                className="flex items-center gap-1.5 text-xs px-3 py-1 h-auto font-semibold bg-transparent border-2 border-purple-500 text-purple-600 dark:text-purple-400 dark:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200"
+                                className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1 h-auto font-semibold bg-transparent border-2 border-purple-500 text-purple-600 dark:text-purple-400 dark:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200"
                             >
                                 <Crown className="w-3.5 h-3.5" />
                                 <span>Get Premium</span>
@@ -470,28 +514,33 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                         )}
 
                         {userRole === 'learner' && isPremium && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md shadow-md border-0">
+                            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md shadow-md border-0">
                                 <Crown className="w-3.5 h-3.5 animate-pulse" />
                                 <span>Premium</span>
                             </div>
                         )}
 
-                        <Button
-                            onClick={handleCoinsClick}
-                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 h-auto font-semibold bg-transparent border-2 border-amber-500 text-amber-600 dark:text-amber-400 dark:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all duration-200"
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            <CoinsIcon className="w-3.5 h-3.5" />
-                            <span>{userCoins}</span>
-                        </Button>
+                        {userRole === 'learner' && (
+                            <Button
+                                onClick={handleCoinsClick}
+                                className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 h-auto font-semibold bg-transparent border-2 border-amber-500 text-amber-600 dark:text-amber-400 dark:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all duration-200"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <CoinsIcon className="w-3.5 h-3.5" />
+                                <span>{userCoins}</span>
+                            </Button>
+                        )}
 
-                        <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
-                            <Star className="w-3 h-3 fill-yellow-400" />
-                            <span className="font-semibold">{starData.total_stars}</span>
-                        </Badge>
+                        {userRole === 'learner' && (
+                            <Badge variant="secondary" className="hidden sm:flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
+                                <Star className="w-3 h-3 fill-yellow-400" />
+                                <span className="font-semibold">{starData.total_stars}</span>
+                            </Badge>
+                        )}
 
+                        {/* Level/XP - show only on sm+ */}
                         {userRole === 'learner' && currentLevel && (
-                            <div className="hidden sm:flex items-center gap-2 min-w-[180px]">
+                            <div className="hidden sm:flex items-center gap-2 min-w-[120px]">
                                 <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 flex-shrink-0">
                                     <Crown className="w-3 h-3" />
                                     <span>Level {currentLevel}</span>
@@ -508,14 +557,26 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                             </div>
                         )}
 
-                        {userRole === 'learner' && currentLevel && (
-                            <div className="sm:hidden">
+                        {/* Compact info for mobile */}
+                        <div className="flex sm:hidden items-center gap-1">
+                            {userRole === 'learner' && (
                                 <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5">
                                     <Crown className="w-3 h-3" />
                                     <span>{currentLevel}</span>
                                 </Badge>
-                            </div>
-                        )}
+                            )}
+                            <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
+                                <Star className="w-3 h-3 fill-yellow-400" />
+                                <span className="font-semibold">{starData.total_stars}</span>
+                            </Badge>
+                            <Button
+                                onClick={handleCoinsClick}
+                                className="flex items-center gap-1 text-xs px-2 py-1 h-auto font-semibold bg-transparent border-2 border-amber-500 text-amber-600 dark:text-amber-400 dark:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all duration-200"
+                            >
+                                <CoinsIcon className="w-3.5 h-3.5" />
+                                <span>{userCoins}</span>
+                            </Button>
+                        </div>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -529,9 +590,9 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                                         </Avatar>
                                         {getSelectedBorderImage() && (
                                             <img
-                                                src={getSelectedBorderImage() as string}
+                                                src={decryptPath(getSelectedBorderImage() as string)}
                                                 alt="Avatar Border"
-                                                className="absolute inset-0 w-full h-full pointer-events-none scale-150 rounded-full"
+                                                className="absolute inset-0 w-full h-full pointer-events-none scale-130 rounded-full"
                                             />
                                         )}
                                     </div>

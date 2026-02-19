@@ -485,7 +485,7 @@ export default function CourseMap() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <div className="h-96 w-full rounded-md overflow-hidden">
+                    <div className="h-120 w-full rounded-md overflow-hidden">
                         <HoverContext.Provider value={{ hoveredCountryId, setHoveredCountryId }}>
                             <Map center={[20, 0]} zoom={2} className="h-full w-full">
                                 <MapTileLayer />

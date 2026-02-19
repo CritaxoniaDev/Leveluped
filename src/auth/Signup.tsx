@@ -5,6 +5,7 @@ import { Input } from "@/packages/shadcn/ui/input"
 import { Separator } from "@/packages/shadcn/ui/separator"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
+import { ArrowLeft } from "lucide-react"
 
 export default function Signup() {
     const [email, setEmail] = useState("")
@@ -109,6 +110,15 @@ export default function Signup() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                     {/* Left Side - Login Form */}
                     <div className="flex flex-col">
+                        {/* Back Arrow */}
+                        <Button
+                            variant="ghost"
+                            className="mb-4 w-fit text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => navigate("/")}
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            Back to Home
+                        </Button>
                         {/* Logo Section */}
                         <div className="mb-4">
                             <h1 className="text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
@@ -122,6 +132,16 @@ export default function Signup() {
 
                         {/* Form Container */}
                         <div className="space-y-8">
+                            {/* Note for first time users */}
+                            <div className="rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 text-sm mb-2 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" />
+                                </svg>
+                                <span>
+                                    <strong>Note:</strong> First time registered users will receive <span className="font-semibold">100 coins</span> as a welcome bonus!
+                                </span>
+                            </div>
                             {/* Login Form */}
                             <form onSubmit={handleMagicLink} className="space-y-6">
                                 {/* Name and Username in one row */}
@@ -213,16 +233,16 @@ export default function Signup() {
                             <div className="space-y-4">
                                 <div className="text-center text-xs text-gray-500 dark:text-gray-400">
                                     By signing up, you agree to our{" "}
-                                    <a 
-                                        href="/terms-of-service" 
+                                    <a
+                                        href="/terms-of-service"
                                         rel="noopener noreferrer"
                                         className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                     >
                                         Terms of Service
                                     </a>
                                     {" "}and{" "}
-                                    <a 
-                                        href="/privacy-policy" 
+                                    <a
+                                        href="/privacy-policy"
                                         rel="noopener noreferrer"
                                         className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                     >
