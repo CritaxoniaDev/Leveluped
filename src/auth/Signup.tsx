@@ -70,6 +70,40 @@ export default function Signup() {
         }
 
         try {
+            // Check if email already exists
+            const { data: existingUser, error: userError } = await supabase
+                .from("users")
+                .select("id")
+                .eq("email", email.toLowerCase())
+                .single()
+
+            if (existingUser) {
+                toast.error("Email Already Registered", {
+                    description: "This email is already in use. Please log in instead."
+                })
+                setLoading(false)
+                return
+            }
+
+            if (userError && userError.code !== "PGRST116") {
+                throw userError
+            }
+
+            // Check if username already exists
+            const { data: existingUsername } = await supabase
+                .from("users")
+                .select("id")
+                .eq("username", username.toLowerCase())
+                .single()
+
+            if (existingUsername) {
+                toast.error("Username Already Taken", {
+                    description: "This username is already registered. Please choose another."
+                })
+                setLoading(false)
+                return
+            }
+
             const { error } = await supabase.auth.signInWithOtp({
                 email: email.toLowerCase(),
                 options: {

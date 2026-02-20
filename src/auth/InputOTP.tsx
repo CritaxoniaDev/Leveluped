@@ -85,6 +85,24 @@ export default function InputOTP() {
                     setLoading(false)
                     return
                 }
+
+                // Create user_wallets record with 100 coins
+                const { error: walletError } = await supabase
+                    .from("user_wallets")
+                    .insert({
+                        user_id: data.user.id,
+                        total_coins: 100,
+                        available_coins: 100
+                    })
+
+                if (walletError) {
+                    console.error("Error creating wallet:", walletError)
+                    toast.error("Error", {
+                        description: "Failed to create user wallet"
+                    })
+                    setLoading(false)
+                    return
+                }
             }
 
             // Generate session token
