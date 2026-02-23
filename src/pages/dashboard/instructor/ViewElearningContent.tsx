@@ -159,7 +159,7 @@ export default function ViewElearningContent() {
             <Edit className="w-4 h-4 mr-2" />
             Edit
           </Button>
-          
+
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20">
@@ -232,7 +232,16 @@ export default function ViewElearningContent() {
             <CardContent className="space-y-4">
               <div className="prose dark:prose-invert max-w-none">
                 <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {section.content}
+                  {section.content.split(/\s+/).map((word, i) => {
+                    if (word.includes('char') || word.includes('`')) {
+                      return (
+                        <code key={i} className="mx-1 px-1 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-400">
+                          {word}
+                        </code>
+                      )
+                    }
+                    return word + ' '
+                  })}
                 </p>
               </div>
 

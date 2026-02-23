@@ -433,7 +433,19 @@ export default function ViewElearningContent() {
                       </h4>
                       <div className="prose dark:prose-invert max-w-none">
                         <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line text-base">
-                          {section.content}
+                          {section.content.split(/\s+/).map((word: string, i: number) => {
+                            if (word.includes('char') || word.includes('`')) {
+                              return (
+                                <code
+                                  key={i}
+                                  className="mx-1 px-1 rounded bg-gray-100 dark:bg-gray-800 text-pink-600 dark:text-pink-400"
+                                >
+                                  {word}
+                                </code>
+                              )
+                            }
+                            return word + ' '
+                          })}
                         </div>
                       </div>
                     </div>

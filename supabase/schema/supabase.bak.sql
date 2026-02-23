@@ -1123,3 +1123,413 @@ CREATE TABLE public.stripe_sessions (
   CONSTRAINT stripe_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
   CONSTRAINT stripe_sessions_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.premium_plans(id)
 );
+
+
+---------------------------------------------------------
+-- Mini Games
+
+-- Mini Games Table
+CREATE TABLE public.mini_games (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  icon text,
+  category text NOT NULL,
+  difficulty text DEFAULT 'easy' CHECK (difficulty IN ('easy', 'intermediate', 'advanced')),
+  is_free boolean DEFAULT true,
+  coin_cost integer DEFAULT 0,
+  max_players integer DEFAULT 1,
+  time_limit integer DEFAULT 300, -- in seconds
+  leaderboard_enabled boolean DEFAULT true,
+  xp_reward integer DEFAULT 100,
+  coin_reward integer DEFAULT 0,
+  badge_id uuid REFERENCES public.badges(id) ON DELETE SET NULL,
+  thumbnail_url text,
+  game_type text NOT NULL CHECK (game_type IN ('memory', 'puzzle', 'word', 'math', 'reflex', 'logic')),
+  instructions text,
+  is_published boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT mini_games_pkey PRIMARY KEY (id)
+);
+
+-- Mini Game Scores Table
+CREATE TABLE public.mini_game_scores (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  game_id uuid NOT NULL,
+  score integer NOT NULL,
+  time_taken integer, -- in seconds
+  accuracy decimal(5,2), -- percentage
+  completed_at timestamp with time zone DEFAULT now(),
+  is_high_score boolean DEFAULT false,
+  xp_earned integer DEFAULT 0,
+  coin_earned integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT mini_game_scores_pkey PRIMARY KEY (id),
+  CONSTRAINT mini_game_scores_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT mini_game_scores_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.mini_games(id) ON DELETE CASCADE,
+  UNIQUE(user_id, game_id, completed_at)
+);
+
+-- Mini Game Unlocks Table (for games that need coins to unlock)
+CREATE TABLE public.mini_game_unlocks (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE,
+  game_id uuid NOT NULL,
+  unlocked_at timestamp with time zone DEFAULT now(),
+  unlock_type text DEFAULT 'coin_purchase' CHECK (unlock_type IN ('coin_purchase', 'achievement', 'level_up')),
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT mini_game_unlocks_pkey PRIMARY KEY (id),
+  CONSTRAINT mini_game_unlocks_user_id_game_id_fkey UNIQUE(user_id, game_id),
+  CONSTRAINT mini_game_unlocks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE,
+  CONSTRAINT mini_game_unlocks_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.mini_games(id) ON DELETE CASCADE
+);
+
+-- Create indexes
+CREATE INDEX idx_mini_games_category ON public.mini_games(category);
+CREATE INDEX idx_mini_games_game_type ON public.mini_games(game_type);
+CREATE INDEX idx_mini_games_is_published ON public.mini_games(is_published);
+CREATE INDEX idx_mini_game_scores_user_id ON public.mini_game_scores(user_id);
+CREATE INDEX idx_mini_game_scores_game_id ON public.mini_game_scores(game_id);
+CREATE INDEX idx_mini_game_scores_completed_at ON public.mini_game_scores(completed_at DESC);
+CREATE INDEX idx_mini_game_scores_is_high_score ON public.mini_game_scores(is_high_score);
+CREATE INDEX idx_mini_game_unlocks_user_id ON public.mini_game_unlocks(user_id);
+CREATE INDEX idx_mini_game_unlocks_game_id ON public.mini_game_unlocks(game_id);
+
+-- Enable RLS
+ALTER TABLE public.mini_games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mini_game_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mini_game_unlocks ENABLE ROW LEVEL SECURITY;
+
+-- Policies for mini_games
+CREATE POLICY "Anyone can view published mini games" ON public.mini_games
+    FOR SELECT USING (is_published = true);
+
+CREATE POLICY "Admins can manage mini games" ON public.mini_games
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.users 
+            WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- Policies for mini_game_scores
+CREATE POLICY "Users can view their own scores" ON public.mini_game_scores
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own scores" ON public.mini_game_scores
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Public can view high scores" ON public.mini_game_scores
+    FOR SELECT USING (is_high_score = true);
+
+-- Policies for mini_game_unlocks
+CREATE POLICY "Users can view their own unlocks" ON public.mini_game_unlocks
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own unlocks" ON public.mini_game_unlocks
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Function to check if user can play a game
+CREATE OR REPLACE FUNCTION user_can_play_game(p_user_id UUID, p_game_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_is_free BOOLEAN;
+    v_coin_cost INTEGER;
+    v_user_coins INTEGER;
+    v_is_unlocked BOOLEAN;
+BEGIN
+    -- Get game info
+    SELECT is_free, coin_cost INTO v_is_free, v_coin_cost
+    FROM public.mini_games
+    WHERE id = p_game_id;
+
+    -- If free, can play
+    IF v_is_free THEN
+        RETURN true;
+    END IF;
+
+    -- Check if user has unlocked the game
+    SELECT EXISTS (
+        SELECT 1 FROM public.mini_game_unlocks
+        WHERE user_id = p_user_id AND game_id = p_game_id
+    ) INTO v_is_unlocked;
+
+    IF v_is_unlocked THEN
+        RETURN true;
+    END IF;
+
+    -- Check if user has enough coins
+    SELECT available_coins INTO v_user_coins
+    FROM public.user_wallets
+    WHERE user_id = p_user_id;
+
+    RETURN COALESCE(v_user_coins, 0) >= v_coin_cost;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to complete a mini game
+CREATE OR REPLACE FUNCTION complete_mini_game(
+    p_user_id UUID,
+    p_game_id UUID,
+    p_score INTEGER,
+    p_time_taken INTEGER,
+    p_accuracy DECIMAL
+)
+RETURNS TABLE(
+    game_id UUID,
+    score INTEGER,
+    xp_earned INTEGER,
+    coin_earned INTEGER,
+    is_high_score BOOLEAN,
+    message TEXT
+) AS $$
+DECLARE
+    v_game_record RECORD;
+    v_user_coins INTEGER;
+    v_xp_earned INTEGER;
+    v_coin_earned INTEGER;
+    v_is_high_score BOOLEAN;
+    v_existing_high_score INTEGER;
+BEGIN
+    -- Get game details and check if user can play
+    SELECT is_free, coin_cost, xp_reward, coin_reward 
+    INTO v_game_record
+    FROM public.mini_games
+    WHERE id = p_game_id;
+
+    -- Check if user paid to play (if not free)
+    IF NOT v_game_record.is_free THEN
+        SELECT available_coins INTO v_user_coins
+        FROM public.user_wallets
+        WHERE user_id = p_user_id;
+
+        IF v_user_coins < v_game_record.coin_cost THEN
+            RETURN QUERY SELECT 
+                p_game_id, 
+                0,
+                0,
+                0,
+                false,
+                'Insufficient coins to play this game'::text;
+            RETURN;
+        END IF;
+    END IF;
+
+    -- Calculate rewards
+    v_xp_earned := v_game_record.xp_reward;
+    v_coin_earned := v_game_record.coin_reward;
+
+    -- Check if this is a high score
+    SELECT MAX(score) INTO v_existing_high_score
+    FROM public.mini_game_scores
+    WHERE user_id = p_user_id AND game_id = p_game_id;
+
+    v_is_high_score := p_score > COALESCE(v_existing_high_score, 0);
+
+    -- Bonus for high score
+    IF v_is_high_score THEN
+        v_xp_earned := ROUND(v_xp_earned * 1.5);
+        v_coin_earned := ROUND(v_coin_earned * 1.5);
+    END IF;
+
+    -- Insert score record
+    INSERT INTO public.mini_game_scores (
+        user_id, game_id, score, time_taken, accuracy, is_high_score, xp_earned, coin_earned
+    ) VALUES (p_user_id, p_game_id, p_score, p_time_taken, p_accuracy, v_is_high_score, v_xp_earned, v_coin_earned);
+
+    -- Deduct coins if game was not free
+    IF NOT v_game_record.is_free THEN
+        UPDATE public.user_wallets
+        SET 
+            available_coins = available_coins - v_game_record.coin_cost,
+            spent_coins = spent_coins + v_game_record.coin_cost,
+            updated_at = NOW()
+        WHERE user_id = p_user_id;
+
+        INSERT INTO public.coin_transactions (
+            user_id, amount, type, description, reference_id
+        ) VALUES (
+            p_user_id,
+            v_game_record.coin_cost,
+            'spend',
+            'Mini game play: ' || (SELECT name FROM public.mini_games WHERE id = p_game_id),
+            p_game_id
+        );
+    END IF;
+
+    -- Award XP and coins
+    UPDATE public.user_wallets
+    SET 
+        available_coins = available_coins + v_coin_earned,
+        updated_at = NOW()
+    WHERE user_id = p_user_id;
+
+    INSERT INTO public.coin_transactions (
+        user_id, amount, type, description, reference_id
+    ) VALUES (
+        p_user_id,
+        v_coin_earned,
+        'bonus',
+        'Mini game reward: ' || (SELECT name FROM public.mini_games WHERE id = p_game_id),
+        p_game_id
+    );
+
+    -- Update user stats with XP
+    PERFORM increment_user_xp(p_user_id, v_xp_earned);
+
+    -- Return results
+    RETURN QUERY SELECT 
+        p_game_id,
+        p_score,
+        v_xp_earned,
+        v_coin_earned,
+        v_is_high_score,
+        CASE WHEN v_is_high_score THEN 'New high score! 🎉' ELSE 'Great job! 🎮' END::text;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION user_can_play_game(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION complete_mini_game(UUID, UUID, INTEGER, INTEGER, DECIMAL) TO authenticated;
+
+-- Insert sample mini games
+INSERT INTO public.mini_games (
+    name, description, icon, category, difficulty, is_free, coin_cost, 
+    game_type, xp_reward, coin_reward, time_limit, instructions, is_published, thumbnail_url
+) VALUES
+('Memory Master', 'Test your memory by matching pairs of cards', '🧠', 'Memory', 'easy', true, 0, 'memory', 100, 0, 120, 'Click on cards to flip them. Match all pairs to win!', true, '/games/memory.png'),
+('Word Blast', 'Form words from the scrambled letters', '📝', 'Word', 'medium', true, 0, 'word', 150, 10, 180, 'Use the letters to form valid English words. More words = higher score!', true, '/games/word.png'),
+('Math Master', 'Solve math problems as fast as you can', '🔢', 'Math', 'easy', true, 0, 'math', 120, 5, 120, 'Answer the math questions correctly. Speed and accuracy matter!', true, '/games/math.png'),
+('Puzzle Rush', 'Complete sliding puzzles under pressure', '🧩', 'Puzzle', 'medium', false, 50, 'puzzle', 200, 25, 300, 'Slide the tiles to complete the image before time runs out!', true, '/games/puzzle.png'),
+('Reflex Zone', 'Test your reflexes with quick reactions', '⚡', 'Reflex', 'hard', false, 75, 'reflex', 250, 50, 60, 'Click as fast as you can when the targets appear. Be quick!', true, '/games/reflex.png'),
+('Logic Quest', 'Solve complex logic puzzles', '🎯', 'Logic', 'hard', false, 100, 'logic', 300, 75, 600, 'Use deductive reasoning to solve the logic puzzles. Take your time!', true, '/games/logic.png'),
+('Number Ninja', 'Match numbers in a lightning-fast grid', '⚔️', 'Math', 'medium', true, 0, 'math', 140, 10, 90, 'Find and match the numbers as they appear. Speed is key!', true, '/games/ninja.png'),
+('Color Connect', 'Connect matching colors before they overflow', '🎨', 'Puzzle', 'easy', true, 0, 'logic', 110, 5, 150, 'Draw lines to connect matching colors. Dont let them overflow!', true, '/games/connect.png');
+
+
+----------------------------------------------------------------------------------
+-- Function to complete a mini game
+CREATE OR REPLACE FUNCTION complete_mini_game(
+    p_user_id UUID,
+    p_game_id UUID,
+    p_score INTEGER,
+    p_time_taken INTEGER,
+    p_accuracy DECIMAL
+)
+RETURNS TABLE(
+    game_id UUID,
+    score INTEGER,
+    xp_earned INTEGER,
+    coin_earned INTEGER,
+    is_high_score BOOLEAN,
+    message TEXT
+) AS $$
+DECLARE
+    v_game_record RECORD;
+    v_user_coins INTEGER;
+    v_xp_earned INTEGER;
+    v_coin_earned INTEGER;
+    v_is_high_score BOOLEAN;
+    v_existing_high_score INTEGER;
+BEGIN
+    -- Get game details and check if user can play
+    SELECT mini_games.is_free, mini_games.coin_cost, mini_games.xp_reward, mini_games.coin_reward 
+    INTO v_game_record
+    FROM public.mini_games
+    WHERE mini_games.id = p_game_id;
+
+    -- Check if user paid to play (if not free)
+    IF NOT v_game_record.is_free THEN
+        SELECT user_wallets.available_coins INTO v_user_coins
+        FROM public.user_wallets
+        WHERE user_wallets.user_id = p_user_id;
+
+        IF v_user_coins < v_game_record.coin_cost THEN
+            RETURN QUERY SELECT 
+                p_game_id, 
+                0,
+                0,
+                0,
+                false,
+                'Insufficient coins to play this game'::text;
+            RETURN;
+        END IF;
+    END IF;
+
+    -- Calculate rewards
+    v_xp_earned := v_game_record.xp_reward;
+    v_coin_earned := v_game_record.coin_reward;
+
+    -- Check if this is a high score
+    SELECT MAX(mini_game_scores.score) INTO v_existing_high_score
+    FROM public.mini_game_scores
+    WHERE mini_game_scores.user_id = p_user_id AND mini_game_scores.game_id = p_game_id;
+
+    v_is_high_score := p_score > COALESCE(v_existing_high_score, 0);
+
+    -- Bonus for high score
+    IF v_is_high_score THEN
+        v_xp_earned := ROUND(v_xp_earned * 1.5);
+        v_coin_earned := ROUND(v_coin_earned * 1.5);
+    END IF;
+
+    -- Insert score record
+    INSERT INTO public.mini_game_scores (
+        user_id, game_id, score, time_taken, accuracy, is_high_score, xp_earned, coin_earned
+    ) VALUES (p_user_id, p_game_id, p_score, p_time_taken, p_accuracy, v_is_high_score, v_xp_earned, v_coin_earned);
+
+    -- Deduct coins if game was not free
+    IF NOT v_game_record.is_free THEN
+        UPDATE public.user_wallets
+        SET 
+            available_coins = available_coins - v_game_record.coin_cost,
+            spent_coins = spent_coins + v_game_record.coin_cost,
+            updated_at = NOW()
+        WHERE user_wallets.user_id = p_user_id;
+
+        INSERT INTO public.coin_transactions (
+            user_id, amount, type, description, reference_id
+        ) VALUES (
+            p_user_id,
+            v_game_record.coin_cost,
+            'spend',
+            'Mini game play: ' || (SELECT mini_games.name FROM public.mini_games WHERE mini_games.id = p_game_id),
+            p_game_id
+        );
+    END IF;
+
+    -- Award XP and coins
+    UPDATE public.user_wallets
+    SET 
+        available_coins = available_coins + v_coin_earned,
+        updated_at = NOW()
+    WHERE user_wallets.user_id = p_user_id;
+
+    INSERT INTO public.coin_transactions (
+        user_id, amount, type, description, reference_id
+    ) VALUES (
+        p_user_id,
+        v_coin_earned,
+        'bonus',
+        'Mini game reward: ' || (SELECT mini_games.name FROM public.mini_games WHERE mini_games.id = p_game_id),
+        p_game_id
+    );
+
+    -- Update user stats with XP
+    PERFORM increment_user_xp(p_user_id, v_xp_earned);
+
+    -- Return results
+    RETURN QUERY SELECT 
+        p_game_id,
+        p_score,
+        v_xp_earned,
+        v_coin_earned,
+        v_is_high_score,
+        CASE WHEN v_is_high_score THEN 'New high score! 🎉' ELSE 'Great job! 🎮' END::text;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION complete_mini_game(UUID, UUID, INTEGER, INTEGER, DECIMAL) TO authenticated;

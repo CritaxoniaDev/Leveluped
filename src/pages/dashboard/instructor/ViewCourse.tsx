@@ -244,7 +244,7 @@ export default function ViewCourse() {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "mistralai/mistral-small-3.1-24b-instruct:free",
+                    model: "google/gemma-3-12b-it:free",
                     messages: [
                         {
                             role: "user",

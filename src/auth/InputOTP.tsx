@@ -218,7 +218,7 @@ export default function InputOTP() {
 
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
                             disabled={loading || token.length !== 8}
                         >
                             {loading ? "Verifying..." : "Verify Code"}

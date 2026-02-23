@@ -810,56 +810,59 @@ export default function Dashboard() {
       {/* Country Details Dialog */}
       <Dialog open={isCountryDialogOpen} onOpenChange={setIsCountryDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <MapPin className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <DialogTitle className="text-2xl font-bold head-font">
-                    {selectedCountry?.country_name}
-                  </DialogTitle>
-                  <DialogDescription className="text-base">
-                    Discover amazing courses in this region
-                  </DialogDescription>
-                </div>
+          <DialogHeader className="space-y-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-900/20 rounded-xl shadow-sm">
+                <MapPin className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <DialogTitle className="text-2xl font-bold head-font text-gray-900 dark:text-white mb-1">
+                  {selectedCountry?.country_name}
+                </DialogTitle>
+                <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+                  Discover amazing courses in this region
+                </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           {selectedCountry && (
-            <div className="space-y-6">
+            <div className="space-y-6 pt-2">
               {/* Stats Cards */}
               <div className="grid grid-cols-2 gap-4">
-                <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/40">
+                <Card className="border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-900/10 shadow-sm hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
                       Level Range
                     </p>
-                    <div className="flex items-baseline gap-1">
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                         {selectedCountry.min_level}
                       </p>
-                      <p className="text-gray-500">to</p>
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">to</p>
+                      <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                         {selectedCountry.max_level}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/40">
+                <Card className="border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-900/20 dark:to-green-900/10 shadow-sm hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
                       Your Level
                     </p>
                     <div className="flex items-center gap-2">
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                         {stats.current_level}
                       </p>
                       {stats.current_level >= selectedCountry.min_level && stats.current_level <= selectedCountry.max_level && (
-                        <Badge className="bg-green-500">Accessible</Badge>
+                        <Badge className="bg-green-500 text-white text-xs">Accessible</Badge>
+                      )}
+                      {(stats.current_level < selectedCountry.min_level || stats.current_level > selectedCountry.max_level) && (
+                        <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">
+                          Locked
+                        </Badge>
                       )}
                     </div>
                   </CardContent>
@@ -867,69 +870,80 @@ export default function Dashboard() {
               </div>
 
               {/* Available Courses Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-3">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Available Courses
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {getCoursesInCountry(selectedCountry.id).length} {getCoursesInCountry(selectedCountry.id).length === 1 ? 'course' : 'courses'} waiting for you
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {getCoursesInCountry(selectedCountry.id).length} {getCoursesInCountry(selectedCountry.id).length === 1 ? 'course' : 'courses'} awaits you
                     </p>
                   </div>
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
+                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-sm px-3 py-1">
                     {getCoursesInCountry(selectedCountry.id).length}
                   </Badge>
                 </div>
 
                 {getCoursesInCountry(selectedCountry.id).length > 0 ? (
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2 scrollbar-thin">
                     {getCoursesInCountry(selectedCountry.id).slice(0, 5).map((course) => (
-                      <Card key={course.id} className="border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer">
+                      <Card
+                        key={course.id}
+                        className="border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all cursor-pointer bg-white dark:bg-gray-800/50"
+                        onClick={() => {
+                          setSelectedCourse(course)
+                          setIsCoursesDialogOpen(true)
+                        }}
+                      >
                         <CardContent className="p-3">
                           <div className="flex items-start gap-3">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
                               <BookCopy className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                              <h4 className="font-semibold text-gray-900 dark:text-white truncate text-sm">
                                 {course.title}
                               </h4>
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 {course.category}
                               </p>
                               <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <Badge variant="outline" className="text-xs">
-                                  Level {course.levels}
+                                <Badge variant="outline" className="text-xs bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
+                                  <span className="text-gray-600 dark:text-gray-300">Level {course.levels}</span>
                                 </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {course.max_xp} XP
+                                <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700">
+                                  <span className="text-yellow-700 dark:text-yellow-400">{course.max_xp} XP</span>
                                 </Badge>
                                 {course.enrolled && (
-                                  <Badge className="text-xs bg-green-500">Enrolled</Badge>
+                                  <Badge className="text-xs bg-green-500 text-white">Enrolled</Badge>
                                 )}
                               </div>
                             </div>
-                            <Eye className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1" />
+                            <Eye className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-1" />
                           </div>
                         </CardContent>
                       </Card>
                     ))}
                     {getCoursesInCountry(selectedCountry.id).length > 5 && (
-                      <div className="p-3 text-center border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                      <div className="p-3 text-center border border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50/50 dark:bg-gray-800/30">
                         <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                          +{getCoursesInCountry(selectedCountry.id).length - 5} more courses available
+                          +{getCoursesInCountry(selectedCountry.id).length - 5} more {getCoursesInCountry(selectedCountry.id).length - 5 === 1 ? 'course' : 'courses'}
                         </p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="p-8 text-center border border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/20">
-                    <BookCopy className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 dark:text-gray-400 font-medium">
+                  <div className="p-8 text-center border border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/30">
+                    <div className="flex justify-center mb-3">
+                      <div className="p-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                        <BookCopy className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                      </div>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 font-medium text-sm">
                       No courses available yet
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
                       Check back soon for new content
                     </p>
                   </div>
@@ -938,7 +952,7 @@ export default function Dashboard() {
 
               {/* Action Button */}
               <Button
-                className="w-full h-11 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold"
+                className="w-full h-11 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-600 dark:to-blue-700 dark:hover:from-blue-700 dark:hover:to-blue-800 text-white font-semibold shadow-md hover:shadow-lg transition-all"
                 onClick={() => {
                   setIsCountryDialogOpen(false)
                   setShowCountryMap(true)

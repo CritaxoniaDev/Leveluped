@@ -5,6 +5,7 @@ import { Map, MapTileLayer, MapMarker, MapPopup, MapTooltip, MapLayers, MapZoomC
 import { MapPinIcon } from "lucide-react"
 import { AuroraText } from "@/packages/shadcn/ui/aurora-text"
 import { useNavigate } from "react-router-dom"
+
 interface HeroSectionProps {
     onSignIn: () => void
 }
@@ -13,7 +14,15 @@ export default function HeroSection({ onSignIn }: HeroSectionProps) {
     const navigate = useNavigate()
 
     return (
-        <section className="relative flex flex-col items-center text-sm bg-white">
+        <section className="relative flex flex-col items-center text-sm bg-white overflow-hidden">
+            {/* Animated Gradient Blob Background */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-10 left-10 w-72 h-72 bg-blue-200 dark:bg-blue-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+                <div className="absolute bottom-10 left-10 w-72 h-72 bg-green-200 dark:bg-blue-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+                <div className="absolute top-40 right-10 w-72 h-72 bg-purple-200 dark:bg-purple-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+                <div className="absolute bottom-10 right-2 w-72 h-72 bg-pink-200 dark:bg-pink-900/20 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+            </div>
+
             {/* Main Content */}
             <main className="relative z-10 flex flex-col items-center max-md:px-2">
                 {/* Localized Striped Pattern Section */}
@@ -49,8 +58,8 @@ export default function HeroSection({ onSignIn }: HeroSectionProps) {
                     </div>
 
                     {/* Headline */}
-                    <h1 className="relative z-10 head-font tracking-normal text-center text-5xl leading-[68px] md:text-6xl md:leading-[80px] font-bold max-w-4xl text-slate-900">
-                        Transform Learning with <AuroraText >LevelUpED</AuroraText>
+                    <h1 className="relative z-10 head-font tracking-normal text-center text-5xl leading-[68px] md:text-5xl md:leading-[80px] font-bold max-w-4xl text-slate-900">
+                        Transform Learning with <AuroraText className="text-7xl">LevelUpED</AuroraText>
                     </h1>
 
                     {/* Subheadline */}
@@ -63,7 +72,7 @@ export default function HeroSection({ onSignIn }: HeroSectionProps) {
                 <div className="flex items-center gap-4 mt-8">
                     <Button
                         onClick={onSignIn}
-                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white active:scale-95 rounded-lg px-7 h-11 transition"
+                        className="flex items-center gap-2 w-45 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white active:scale-95 rounded-lg px-7 h-11 transition"
                     >
                         Get Started
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -158,6 +167,32 @@ export default function HeroSection({ onSignIn }: HeroSectionProps) {
                     </Map>
                 </div>
             </main>
+
+            <style>{`
+                @keyframes blob {
+                    0%, 100% {
+                        transform: translate(0, 0) scale(1);
+                    }
+                    33% {
+                        transform: translate(30px, -50px) scale(1.1);
+                    }
+                    66% {
+                        transform: translate(-20px, 20px) scale(0.9);
+                    }
+                }
+                
+                .animate-blob {
+                    animation: blob 7s infinite;
+                }
+                
+                .animation-delay-2000 {
+                    animation-delay: 2s;
+                }
+                
+                .animation-delay-4000 {
+                    animation-delay: 4s;
+                }
+            `}</style>
         </section>
     )
 }

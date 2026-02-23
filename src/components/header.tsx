@@ -380,6 +380,10 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         navigate('/dashboard/learner/premium')
     }
 
+    const handleSettingsClick = () => {
+        navigate('/dashboard/learner/settings')
+    }
+
     const getSelectedBorderImage = () => {
         const border = AVATAR_BORDERS.find(b => b.id === userAvatarBorder)
         return border?.image || undefined
@@ -418,7 +422,7 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
         ? "fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-6xl rounded-xl shadow-lg backdrop-blur-md bg-white/85 dark:bg-gray-900/85 border border-gray-200/50 dark:border-gray-700/50"
         : "bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800"
 
-    const paddingClass = isFloating ? "px-3 py-2.5 sm:px-5" : "px-3 py-3 sm:px-6 sm:py-4"
+    const paddingClass = isFloating ? "px-3 py-2.5 sm:px-5 border-2 border-gray-300" : "px-3 py-3 sm:px-6 sm:py-4"
 
     return (
         <>
@@ -433,9 +437,17 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                         >
                             <Menu className="w-6 h-6" />
                         </button>
-                        <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent head-font whitespace-nowrap">
-                            LevelUpED
-                        </h1>
+                        <img
+                            src="/images/leveluped-mainlogo.png"
+                            alt="LevelUpED Logo"
+                            className="w-12 h-12 rounded-lg"
+                        />
+                        {userRole === 'learner' && isPremium && (
+                            <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-700 flex items-center gap-1">
+                                <Crown className="w-3 h-3" />
+                                <span>Premium</span>
+                            </Badge>
+                        )}
                         {/* Desktop Nav */}
                         {menuItems && menuItems.length > 0 && (
                             <nav className="hidden md:flex ml-4">
@@ -513,13 +525,6 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                             </Button>
                         )}
 
-                        {userRole === 'learner' && isPremium && (
-                            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md shadow-md border-0">
-                                <Crown className="w-3.5 h-3.5 animate-pulse" />
-                                <span>Premium</span>
-                            </div>
-                        )}
-
                         {userRole === 'learner' && (
                             <Button
                                 onClick={handleCoinsClick}
@@ -531,12 +536,12 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                             </Button>
                         )}
 
-                        {userRole === 'learner' && (
+                        {/* {userRole === 'learner' && (
                             <Badge variant="secondary" className="hidden sm:flex items-center gap-1 text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700">
                                 <Star className="w-3 h-3 fill-yellow-400" />
                                 <span className="font-semibold">{starData.total_stars}</span>
                             </Badge>
-                        )}
+                        )} */}
 
                         {/* Level/XP - show only on sm+ */}
                         {userRole === 'learner' && currentLevel && (
@@ -662,6 +667,11 @@ export function Header({ userName, userRole, userLevel, menuItems, isFloating = 
                                         </DropdownMenuItem>
                                     </>
                                 )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleSettingsClick} className="text-xs sm:text-sm">
+                                    <User className="mr-2 h-3.5 w-3.5" />
+                                    <span>Settings</span>
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="text-xs sm:text-sm">
                                     <LogOut className="mr-2 h-3.5 w-3.5" />

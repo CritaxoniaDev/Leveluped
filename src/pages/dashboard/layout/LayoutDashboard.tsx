@@ -27,6 +27,7 @@ import {
     ChevronRight,
     CircleStar,
     Coins,
+    Gamepad2,
     BanknoteArrowDown,
 } from "lucide-react"
 import {
@@ -373,7 +374,8 @@ function MainContent({ children, allowedRoles }: LayoutDashboardProps) {
         { icon: MessageSquare, label: "Messages", href: "/dashboard/learner/messages" },
         { icon: Trophy, label: "Achievements", href: "/dashboard/learner/achievements" },
         { icon: CircleStar, label: "Leaderboards", href: "/dashboard/learner/leaderboard" },
-        { icon: Settings, label: "Settings", href: "/dashboard/learner/settings" },
+        { icon: Gamepad2, label: "Mini Games", href: "/dashboard/learner/mini-games" },
+        { icon: MessageSquare, label: "Forum", href: "/dashboard/learner/forum" },  
     ]
 
     return (

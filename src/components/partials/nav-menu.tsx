@@ -6,7 +6,7 @@ import {
     BannerIcon,
     BannerTitle,
 } from "@/packages/shadcn/ui/shadcn-io/banner"
-import { Menu, Sparkles } from "lucide-react"
+import { BookMarked, Coins, Info, Menu, MessageCircleQuestionIcon, Sparkles } from "lucide-react"
 
 export default function NavMenu() {
     const [isBannerVisible, setIsBannerVisible] = useState(true)
@@ -35,7 +35,7 @@ export default function NavMenu() {
                             </span>
                         </span>
                     </BannerTitle>
-                    
+
                 </Banner>
             )}
 
@@ -46,21 +46,36 @@ export default function NavMenu() {
                         <img
                             src="/images/leveluped-mainlogo.png"
                             alt="LevelUpED Logo"
-                            className="w-8 h-8 rounded-lg"
+                            className="w-12 h-12 rounded-lg"
                         />
                     </a>
 
                     {/* Centered Links */}
                     <div className="hidden md:flex items-center gap-8 transition duration-500">
-                        <a href="/courses" className="hover:text-indigo-600 transition">
-                            Courses
-                        </a>
-                        <a href="/about" className="hover:text-indigo-600 transition">
-                            About
-                        </a>
-                        <a href="/pricing" className="hover:text-indigo-600 transition">
-                            Pricing
-                        </a>
+                        <div className="flex gap-2 justify-center items-center">
+                            <BookMarked className="w-4 h-4" />
+                            <a href="/courses" className="hover:text-indigo-600 transition">
+                                Courses
+                            </a>
+                        </div>
+                        <div className="flex gap-2 justify-center items-center">
+                            <Info className="w-4 h-4" />
+                            <a href="/about" className="hover:text-indigo-600 transition">
+                                About
+                            </a>
+                        </div>
+                        <div className="flex gap-2 justify-center items-center">
+                            <Coins className="w-4 h-4" />
+                            <a href="/pricing" className="hover:text-indigo-600 transition">
+                                Pricing
+                            </a>
+                        </div>  
+                        <div className="flex gap-2 justify-center items-center">
+                            <MessageCircleQuestionIcon className="w-4 h-4" />
+                            <a href="/faq" className="hover:text-indigo-600 transition">
+                                FAQ
+                            </a>
+                        </div>  
                     </div>
 
                     {/* Desktop Buttons - absolutely right */}

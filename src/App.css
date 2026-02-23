@@ -10,7 +10,7 @@
 body {
   font-family: var(--font);
 }
-
+  
 .head-font, h1 {
   font-family: "Instrument Serif", serif !important;
   letter-spacing: .5px;
@@ -165,6 +165,18 @@ body {
 
   body {
     @apply bg-background text-foreground;
+    cursor: url('/cursors/mouse.png') 0 0, auto;
+  }
+
+  /* Custom cursor for clickable elements */
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .cursor-pointer {
+    cursor: url('/cursors/click.png') 10 10, pointer;
   }
   .leaflet-container {
     @apply !bg-card !font-[inherit];
@@ -238,6 +250,9 @@ body {
   }
 }
 
+
+
 button {
   cursor: pointer !important;
+  cursor: url('/cursors/mouse.png') 10 10, pointer !important;
 }

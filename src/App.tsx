@@ -14,6 +14,7 @@ import Pricing from "@/components/pricing"
 import CourseOverview from "@/pages/CourseOverview"
 import About from "@/pages/About"
 import CookiesPolicy from "@/pages/CookiesPolicy"
+import Faq from "@/pages/Faq"
 import { LayoutDashboard } from "@/pages/dashboard/layout/LayoutDashboard"
 import LearnerDashboard from "@/pages/dashboard/learner/Dashboard"
 import MyCourses from "@/pages/dashboard/learner/MyCourses"
@@ -28,6 +29,10 @@ import LearnerMessage from "@/pages/dashboard/learner/Message"
 import FeedbackPage from "@/pages/dashboard/learner/FeedbackPage"
 import CoinShop from "@/pages/dashboard/learner/CoinShop"
 import Premium from "@/pages/dashboard/learner/Premium"
+import MiniGames from "@/pages/dashboard/learner/MiniGames"
+import MemoryMaster from "@/pages/dashboard/learner/mini-games/MemoryMaster"
+import WordBlast from "@/pages/dashboard/learner/mini-games/WordBlast"
+import MathMaster from "@/pages/dashboard/learner/mini-games/MathMaster"
 import InstructorDashboard from "@/pages/dashboard/instructor/Dashboard"
 import Courses from "@/pages/dashboard/instructor/Courses"
 import ViewCourse from "@/pages/dashboard/instructor/ViewCourse"
@@ -106,6 +111,7 @@ function AppContent() {
         <Route path="/courses" element={<VersionedDiv versionId={versionId}><ReactLenis root><CourseOverview /></ReactLenis></VersionedDiv>} />
         <Route path="/about" element={<VersionedDiv versionId={versionId}><ReactLenis root><About /></ReactLenis></VersionedDiv>} />
         <Route path="/cookies-policy" element={<VersionedDiv versionId={versionId}><ReactLenis root><CookiesPolicy /></ReactLenis></VersionedDiv>} />
+        <Route path="/faq" element={<VersionedDiv versionId={versionId}><ReactLenis root><Faq /></ReactLenis></VersionedDiv>} />
 
         {/* Protected Routes with Layout */}
         <Route path="/dashboard/learner" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerDashboard /></LayoutDashboard></VersionedDiv>} />
@@ -120,6 +126,11 @@ function AppContent() {
         <Route path="/dashboard/learner/achievements" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Achievements /></LayoutDashboard></VersionedDiv>} />
         <Route path="/dashboard/learner/leaderboard" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Leaderboard /></LayoutDashboard></VersionedDiv>} />
         <Route path="/dashboard/learner/premium" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Premium /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/mini-games" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><MiniGames /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/mini-games/memory-master" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><MemoryMaster /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/mini-games/word-blast" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><WordBlast /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/mini-games/math-master" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><MathMaster /></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/forum" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><div className="flex items-center justify-center mt-40 bg-white dark:bg-[#0a0a0a]"><h1 className="text-2xl font-bold text-gray-900 dark:text-white">Forum Coming Soon!</h1></div></LayoutDashboard></VersionedDiv>} />
         <Route path="/dashboard/learner/settings" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerSettings /></LayoutDashboard></VersionedDiv>} />
         
         <Route path="/dashboard/instructor" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorDashboard /></LayoutDashboard></VersionedDiv>} />

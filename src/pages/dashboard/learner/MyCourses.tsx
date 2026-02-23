@@ -234,7 +234,7 @@ export default function MyCourses() {
                     {enrolledCourses.map((course) => (
                         <div
                             key={course.id}
-                            className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-300"
+                            className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
                         >
                             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 p-4 sm:p-6">
                                 {/* Course Image */}
@@ -243,7 +243,7 @@ export default function MyCourses() {
                                         <img
                                             src={course.image_url}
                                             alt={course.title}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            className="w-full h-full object-cover"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center">

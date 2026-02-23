@@ -192,15 +192,16 @@ export default function ViewResourceContent() {
                                             </span>
                                         </div>
                                         <div className="flex-1">
-                                            {resourceContent.type === 'quiz' ? (
-                                                <div>
-                                                    <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                                                        {item.question}
-                                                    </h3>
-                                                    <div className="space-y-2">
+                                            <h3 className="font-medium text-gray-900 dark:text-white mb-3">
+                                                {item.question.includes('[BLANK]')
+                                                    ? renderFillInBlank(item.question)
+                                                    : item.question}
+                                            </h3>
+                                            {resourceContent.type === "quiz" && (
+                                                <>
+                                                    <div className="space-y-2 mb-3">
                                                         {item.options && item.options.map((option: string, optionIndex: number) => {
-                                                            const optionLetter = String.fromCharCode(65 + optionIndex) // A, B, C, D
-                                                            const isCorrect = item.correct_answer === optionLetter
+                                                            const isCorrect = option === item.correct_answer
                                                             return (
                                                                 <div
                                                                     key={optionIndex}
@@ -209,9 +210,12 @@ export default function ViewResourceContent() {
                                                                         : 'bg-gray-50 dark:bg-gray-800'
                                                                         }`}
                                                                 >
-                                                                    <span className={`font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                                                                        {optionLetter}.
-                                                                    </span>
+                                                                    <input
+                                                                        type="radio"
+                                                                        checked={isCorrect}
+                                                                        readOnly
+                                                                        className="accent-green-600"
+                                                                    />
                                                                     <span className={isCorrect ? 'text-green-700 dark:text-green-300 font-medium' : 'text-gray-700 dark:text-gray-300'}>
                                                                         {option}
                                                                     </span>
@@ -222,38 +226,32 @@ export default function ViewResourceContent() {
                                                             )
                                                         })}
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <h3 className="font-medium text-gray-900 dark:text-white mb-3">
-                                                        {renderFillInBlank(item.question)}
-                                                    </h3>
-                                                    <div className="space-y-3">
-                                                        <div>
-                                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Answer:</p>
-                                                            <p className="text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-2 rounded">
-                                                                {item.answer}
-                                                            </p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Explanation:</p>
-                                                            <p className="text-gray-600 dark:text-gray-400">
-                                                                {item.explanation}
-                                                            </p>
-                                                        </div>
-                                                        {item.code_example && (
-                                                            <div>
-                                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Code Example:</p>
-                                                                <CodeBlock
-                                                                    text={item.code_example.replace(/```javascript\n|```\n?/g, '')}
-                                                                    language="javascript"
-                                                                    theme={dracula}
-                                                                    showLineNumbers={true}
-                                                                />
-                                                            </div>
-                                                        )}
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Explanation:</p>
+                                                        <p className="text-gray-600 dark:text-gray-400">
+                                                            {item.explanation}
+                                                        </p>
                                                     </div>
-                                                </div>
+                                                </>
+                                            )}
+                                            {resourceContent.type === "challenge" && (
+                                                <>
+                                                    <div className="mb-3">
+                                                        <CodeBlock
+                                                            text={item.code || ""}
+                                                            language={item.language || "javascript"}
+                                                            showLineNumbers={true}
+                                                            theme={dracula}
+                                                            wrapLongLines
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Explanation:</p>
+                                                        <p className="text-gray-600 dark:text-gray-400">
+                                                            {item.explanation}
+                                                        </p>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
                                     </div>

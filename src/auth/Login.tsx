@@ -213,7 +213,7 @@ export default function Login() {
 
                                 <Button
                                     type="submit"
-                                    className="w-full text-base font-semibold py-5 rounded-lg transition-all duration-200 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 dark:from-blue-500 dark:to-blue-600"
+                                    className="w-full text-base font-semibold py-5 rounded-lg transition-all duration-200 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 dark:from-blue-500 dark:to-blue-600"
                                     disabled={loading || !email || !!emailError}
                                 >
                                     {loading ? (
