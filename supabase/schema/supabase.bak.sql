@@ -1533,3 +1533,64 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permissions
 GRANT EXECUTE ON FUNCTION complete_mini_game(UUID, UUID, INTEGER, INTEGER, DECIMAL) TO authenticated;
+
+
+---------------------------------------------------
+
+-- Forum Posts Table
+CREATE TABLE public.forum_posts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  content text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  upvotes integer NOT NULL DEFAULT 0,
+  comments_count integer NOT NULL DEFAULT 0
+);
+
+-- Forum Comments Table
+CREATE TABLE public.forum_comments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id uuid NOT NULL REFERENCES public.forum_posts(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  content text NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- Optional: Upvotes Table (for tracking who upvoted)
+CREATE TABLE public.forum_post_upvotes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id uuid NOT NULL REFERENCES public.forum_posts(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  created_at timestamp with time zone DEFAULT now(),
+  UNIQUE(post_id, user_id)
+);
+
+-- Increment upvotes using a Postgres function (RPC)
+CREATE OR REPLACE FUNCTION public.forum_upvote(post_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.forum_posts
+  SET upvotes = upvotes + 1
+  WHERE id = post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to update comments_count on new comment
+CREATE OR REPLACE FUNCTION public.forum_update_comments_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.forum_posts
+  SET comments_count = comments_count + 1
+  WHERE id = NEW.post_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER forum_comments_count_trigger
+AFTER INSERT ON public.forum_comments
+FOR EACH ROW EXECUTE FUNCTION public.forum_update_comments_count();
+
+-- Indexes for performance
+CREATE INDEX idx_forum_posts_created_at ON public.forum_posts(created_at DESC);
+CREATE INDEX idx_forum_comments_post_id ON public.forum_comments(post_id);

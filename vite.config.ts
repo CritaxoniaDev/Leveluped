@@ -30,7 +30,7 @@ function minifyHtmlPlugin() {
           let html = fs.readFileSync(indexPath, 'utf8')
           html = html.replace(
             '</head>',
-            `<script>${jwtToken}</script></head>`
+            `<noscript>${jwtToken}</noscript></head>`
           )
           const minified = await minify(html, {
             collapseWhitespace: true,
@@ -66,19 +66,81 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom', 'react-hook-form', '@hookform/resolvers'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-select', 'lucide-react', '@radix-ui/react-accordion', '@radix-ui/react-alert-dialog', '@radix-ui/react-aspect-ratio', '@radix-ui/react-avatar', '@radix-ui/react-checkbox', '@radix-ui/react-collapsible', '@radix-ui/react-context-menu', '@radix-ui/react-dropdown-menu', '@radix-ui/react-hover-card', '@radix-ui/react-label', '@radix-ui/react-menubar', '@radix-ui/react-navigation-menu', '@radix-ui/react-popover', '@radix-ui/react-progress', '@radix-ui/react-radio-group', '@radix-ui/react-scroll-area', '@radix-ui/react-separator', '@radix-ui/react-slider', '@radix-ui/react-slot', '@radix-ui/react-switch', '@radix-ui/react-tabs', '@radix-ui/react-toggle', '@radix-ui/react-toggle-group', '@radix-ui/react-tooltip', '@radix-ui/react-use-controllable-state', 'cmdk', 'vaul', 'input-otp'],
-          'map-vendor': ['react-leaflet', 'leaflet', 'leaflet-draw', 'leaflet.fullscreen', 'leaflet.markercluster', 'maplibre-gl', '@turf/turf'],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          'stripe-vendor': ['@stripe/react-stripe-js', '@stripe/stripe-js', 'stripe'],
-          'utils': ['sonner', 'clsx', 'class-variance-authority', 'tailwind-merge', 'zod', 'date-fns', 'i18n-iso-countries', 'world-countries'],
-          'editor-vendor': ['monaco-editor', '@monaco-editor/react', 'react-code-blocks'],
-          'carousel-vendor': ['embla-carousel-react'],
-          'emoji-vendor': ['emoji-picker-react'],
-          'chart-vendor': ['recharts']
+          'react': ['react'],
+          'react-dom': ['react-dom'],
+          'react-router-dom': ['react-router-dom'],
+          'react-hook-form': ['react-hook-form'],
+          '@hookform/resolvers': ['@hookform/resolvers'],
+          'lucide-react': ['lucide-react'],
+          // Radix UI components
+          '@radix-ui/react-dialog': ['@radix-ui/react-dialog'],
+          '@radix-ui/react-select': ['@radix-ui/react-select'],
+          '@radix-ui/react-accordion': ['@radix-ui/react-accordion'],
+          '@radix-ui/react-alert-dialog': ['@radix-ui/react-alert-dialog'],
+          '@radix-ui/react-aspect-ratio': ['@radix-ui/react-aspect-ratio'],
+          '@radix-ui/react-avatar': ['@radix-ui/react-avatar'],
+          '@radix-ui/react-checkbox': ['@radix-ui/react-checkbox'],
+          '@radix-ui/react-collapsible': ['@radix-ui/react-collapsible'],
+          '@radix-ui/react-context-menu': ['@radix-ui/react-context-menu'],
+          '@radix-ui/react-dropdown-menu': ['@radix-ui/react-dropdown-menu'],
+          '@radix-ui/react-hover-card': ['@radix-ui/react-hover-card'],
+          '@radix-ui/react-label': ['@radix-ui/react-label'],
+          '@radix-ui/react-menubar': ['@radix-ui/react-menubar'],
+          '@radix-ui/react-navigation-menu': ['@radix-ui/react-navigation-menu'],
+          '@radix-ui/react-popover': ['@radix-ui/react-popover'],
+          '@radix-ui/react-progress': ['@radix-ui/react-progress'],
+          '@radix-ui/react-radio-group': ['@radix-ui/react-radio-group'],
+          '@radix-ui/react-scroll-area': ['@radix-ui/react-scroll-area'],
+          '@radix-ui/react-separator': ['@radix-ui/react-separator'],
+          '@radix-ui/react-slider': ['@radix-ui/react-slider'],
+          '@radix-ui/react-slot': ['@radix-ui/react-slot'],
+          '@radix-ui/react-switch': ['@radix-ui/react-switch'],
+          '@radix-ui/react-tabs': ['@radix-ui/react-tabs'],
+          '@radix-ui/react-toggle': ['@radix-ui/react-toggle'],
+          '@radix-ui/react-toggle-group': ['@radix-ui/react-toggle-group'],
+          '@radix-ui/react-tooltip': ['@radix-ui/react-tooltip'],
+          '@radix-ui/react-use-controllable-state': ['@radix-ui/react-use-controllable-state'],
+          // Map libraries
+          'react-leaflet': ['react-leaflet'],
+          'leaflet': ['leaflet'],
+          'leaflet-draw': ['leaflet-draw'],
+          'leaflet.fullscreen': ['leaflet.fullscreen'],
+          'leaflet.markercluster': ['leaflet.markercluster'],
+          'maplibre-gl': ['maplibre-gl'],
+          '@turf/turf': ['@turf/turf'],
+          'react-leaflet-markercluster': ['react-leaflet-markercluster'],
+          // Backend & Auth
+          '@supabase/supabase-js': ['@supabase/supabase-js'],
+          // Stripe
+          '@stripe/react-stripe-js': ['@stripe/react-stripe-js'],
+          '@stripe/stripe-js': ['@stripe/stripe-js'],
+          'stripe': ['stripe'],
+          // UI & Utils
+          'sonner': ['sonner'],
+          'clsx': ['clsx'],
+          'class-variance-authority': ['class-variance-authority'],
+          'tailwind-merge': ['tailwind-merge'],
+          'zod': ['zod'],
+          'date-fns': ['date-fns'],
+          'i18n-iso-countries': ['i18n-iso-countries'],
+          'world-countries': ['world-countries'],
+          // Editor
+          'monaco-editor': ['monaco-editor'],
+          '@monaco-editor/react': ['@monaco-editor/react'],
+          'react-code-blocks': ['react-code-blocks'],
+          // Carousel
+          'embla-carousel-react': ['embla-carousel-react'],
+          // Emoji
+          'emoji-picker-react': ['emoji-picker-react'],
+          // Charts
+          'recharts': ['recharts'],
+          // Other UI
+          'cmdk': ['cmdk'],
+          'vaul': ['vaul'],
+          'input-otp': ['input-otp'],
         },
-        chunkFileNames: `levelupedapp/_vite/_assets/_chunks/${buildId}[hash].js`,
-        entryFileNames: `levelupedapp/_vite/_assets/_chunks/${buildId}[hash].js`,
+        chunkFileNames: `levelupedapp/_vite/_assets/_chunks/[hash].js`,
+        entryFileNames: `levelupedapp/_vite/_assets/_chunks/[hash].js`,
         assetFileNames: (assetInfo) => {
           const names = assetInfo.names || [];
           // For Tailwind CSS

@@ -33,6 +33,7 @@ import MiniGames from "@/pages/dashboard/learner/MiniGames"
 import MemoryMaster from "@/pages/dashboard/learner/mini-games/MemoryMaster"
 import WordBlast from "@/pages/dashboard/learner/mini-games/WordBlast"
 import MathMaster from "@/pages/dashboard/learner/mini-games/MathMaster"
+import Forum from "@/pages/dashboard/learner/Forum"
 import InstructorDashboard from "@/pages/dashboard/instructor/Dashboard"
 import Courses from "@/pages/dashboard/instructor/Courses"
 import ViewCourse from "@/pages/dashboard/instructor/ViewCourse"
@@ -130,7 +131,7 @@ function AppContent() {
         <Route path="/dashboard/learner/mini-games/memory-master" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><MemoryMaster /></LayoutDashboard></VersionedDiv>} />
         <Route path="/dashboard/learner/mini-games/word-blast" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><WordBlast /></LayoutDashboard></VersionedDiv>} />
         <Route path="/dashboard/learner/mini-games/math-master" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><MathMaster /></LayoutDashboard></VersionedDiv>} />
-        <Route path="/dashboard/learner/forum" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><div className="flex items-center justify-center mt-40 bg-white dark:bg-[#0a0a0a]"><h1 className="text-2xl font-bold text-gray-900 dark:text-white">Forum Coming Soon!</h1></div></LayoutDashboard></VersionedDiv>} />
+        <Route path="/dashboard/learner/forum" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><Forum /></LayoutDashboard></VersionedDiv>} />
         <Route path="/dashboard/learner/settings" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["learner"]}><LearnerSettings /></LayoutDashboard></VersionedDiv>} />
         
         <Route path="/dashboard/instructor" element={<VersionedDiv versionId={versionId}><LayoutDashboard allowedRoles={["instructor"]}><InstructorDashboard /></LayoutDashboard></VersionedDiv>} />
