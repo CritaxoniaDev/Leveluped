@@ -7,9 +7,31 @@ import { minify } from 'html-minifier-terser'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 import fs from 'fs'
+import https from 'https'
 
 const buildId = uuidv4()
 dotenv.config()
+
+// Function to fetch user IP geolocation data
+async function fetchIpGeolocation(): Promise<Record<string, any>> {
+  return new Promise((resolve, reject) => {
+    https.get('https://free.freeipapi.com/api/json/', (res) => {
+      let data = ''
+      res.on('data', (chunk) => {
+        data += chunk
+      })
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data))
+        } catch (error) {
+          reject(error)
+        }
+      })
+    }).on('error', (error) => {
+      reject(error)
+    })
+  })
+}
 
 // Custom plugin to minify index.html in production
 function minifyHtmlPlugin() {
@@ -23,18 +45,49 @@ function minifyHtmlPlugin() {
         const indexPath = path.join(distDir, 'index.html')
         const jwtSecret = process.env.VITE_PUBLIC_JWT_SECRET
         if (!jwtSecret) throw new Error('JWT_SECRET is not set')
-        const jwtToken = jwt.sign({ buildId, env: 'production' }, jwtSecret, { expiresIn: '7d' })
 
-        // Inject JWT into index.html as a meta tag
+        const buildTimestamp = new Date().toISOString()
+        const appBuildConfig = {
+          buildId,
+          env: 'production',
+          builtAt: buildTimestamp,
+          version: "1.0.0",
+          appName: 'LevelupEducation',
+          appUrl: "https://levelupeducation.vercel.app",
+          nodeEnv: 'production',
+          buildNumber: Math.floor(Math.random() * 10000),
+        }
+
+        const jwtToken = jwt.sign(appBuildConfig, jwtSecret, { expiresIn: '24h' })
+
+        // Fetch IP geolocation data and create JWT
+        let userConfigToken = ''
+        try {
+          const geoData = await fetchIpGeolocation()
+          userConfigToken = jwt.sign(geoData, jwtSecret, { expiresIn: '24h' })
+        } catch (error) {
+          userConfigToken = jwt.sign({ error: 'geolocation_unavailable' }, jwtSecret, { expiresIn: '24h' })
+        }
+
+        // Inject JWT into index.html
         if (fs.existsSync(indexPath)) {
           let html = fs.readFileSync(indexPath, 'utf8')
           html = html.replace(
-            '</head>',
-            `<noscript>${jwtToken}</noscript></head>`
+            /<!-- -->/,
+            `<!-- ${buildId}${buildTimestamp} -->`
+          )
+
+          html = html.replace(
+            '<script id="appBuildConfig" type="text/plain"></script>',
+            `<script id="appBuildConfig" type="text/plain">${jwtToken}</script>`
+          )
+          html = html.replace(
+            '<script id="userConfig" type="text/plain"></script>',
+            `<script id="userConfig" type="text/plain">${userConfigToken}</script>`
           )
           const minified = await minify(html, {
             collapseWhitespace: true,
-            removeComments: true,
+            removeComments: false,
             removeRedundantAttributes: true,
             removeScriptTypeAttributes: true,
             removeStyleLinkTypeAttributes: true,
