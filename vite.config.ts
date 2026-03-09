@@ -3,7 +3,6 @@ import path from 'path'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { v4 as uuidv4 } from 'uuid'
-import { minify } from 'html-minifier-terser'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 import fs from 'fs'
@@ -33,10 +32,10 @@ async function fetchIpGeolocation(): Promise<Record<string, any>> {
   })
 }
 
-// Custom plugin to minify index.html in production
-function minifyHtmlPlugin() {
+// plugin to inject JWT
+function jwtInjectionPlugin() {
   return {
-    name: 'minify-html',
+    name: 'jwt-injection',
     apply: 'build' as const,
     enforce: 'post' as const,
     async closeBundle() {
@@ -69,7 +68,7 @@ function minifyHtmlPlugin() {
           userConfigToken = jwt.sign({ error: 'geolocation_unavailable' }, jwtSecret, { expiresIn: '24h' })
         }
 
-        // Inject JWT into index.html
+        // Inject JWT into index.html (without minification)
         if (fs.existsSync(indexPath)) {
           let html = fs.readFileSync(indexPath, 'utf8')
           html = html.replace(
@@ -85,17 +84,9 @@ function minifyHtmlPlugin() {
             '<script id="userConfig" type="text/plain"></script>',
             `<script id="userConfig" type="text/plain">${userConfigToken}</script>`
           )
-          const minified = await minify(html, {
-            collapseWhitespace: true,
-            removeComments: false,
-            removeRedundantAttributes: true,
-            removeScriptTypeAttributes: true,
-            removeStyleLinkTypeAttributes: true,
-            minifyCSS: true,
-            minifyJS: true,
-            useShortDoctype: true,
-          })
-          fs.writeFileSync(indexPath, minified)
+          
+          // Write HTML without minification
+          fs.writeFileSync(indexPath, html)
         }
 
         // Write application.json with buildId
@@ -107,7 +98,7 @@ function minifyHtmlPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), minifyHtmlPlugin()],
+  plugins: [react(), tailwindcss(), jwtInjectionPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -192,24 +183,24 @@ export default defineConfig({
           'vaul': ['vaul'],
           'input-otp': ['input-otp'],
         },
-        chunkFileNames: `levelupedapp/_vite/_assets/_chunks/[hash].js`,
-        entryFileNames: `levelupedapp/_vite/_assets/_chunks/[hash].js`,
+        chunkFileNames: `levelupedapp/_assets/_chunks/[hash].js`,
+        entryFileNames: `levelupedapp/_assets/_chunks/[hash].js`,
         assetFileNames: (assetInfo) => {
           const names = assetInfo.names || [];
           // For Tailwind CSS
           if (names.some((n) => n.includes('tailwind'))) {
-            return `levelupedapp/_vite/_assets/_chunks/${buildId}[hash].css`
+            return `levelupedapp/_assets/_chunks/${buildId}[hash].css`
           }
           // For Monaco Editor CSS
           if (names.some((n) => n.toLowerCase().includes('monaco'))) {
-            return `levelupedapp/_vite/_assets/_chunks/${buildId}[hash].css`
+            return `levelupedapp/_assets/_chunks/${buildId}[hash].css`
           }
           // For other CSS files
           if (names.some((n) => n.endsWith('.css'))) {
-            return `levelupedapp/_vite/_assets/_chunks/${buildId}[hash].css`
+            return `levelupedapp/_assets/_chunks/${buildId}[hash].css`
           }
           // For all other assets
-          return `levelupedapp/_vite/_assets/_chunks/${buildId}[hash].[ext]`
+          return `levelupedapp/_assets/_chunks/${buildId}[hash].[ext]`
         }
       }
     }
